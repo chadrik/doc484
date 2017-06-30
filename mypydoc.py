@@ -1,39 +1,147 @@
 import re
+import inspect
 from collections import OrderedDict
 
-from typing import List, Tuple, Dict
-import mypy.parse
-import mypy.types
-from mypy import nodes
-
-from mypy.types import Type, CallableType, AnyType
-from mypy.parsetype import parse_str_as_type, TypeParseError, parse_str_as_signature
+from typing import List, Tuple, Dict, Optional
 
 from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
 from sphinx.ext.napoleon import Config
-config = Config(napoleon_use_param=True, napoleon_use_rtype=True)
 
-from docutils.core import publish_doctree, publish_string
+from docutils.core import publish_doctree
 from docutils.utils import SystemMessage
 
+from mypy.plugin import Plugin, DocstringParserContext
+from mypy.fastparse import parse_type_comment
+from mypy.types import Type
 
-rest_sections = [
-    '\n:param ',
-    '\n:rtype:',
-    '\n:Yields:'
-]
 
-numpy_sections = [
-    '\nParameters\n----------\n',
-    '\nReturns\n-------\n',
-    '\nYields\n------\n'
-]
+def _cleandoc(docstring: str) -> str:
+    return inspect.cleandoc(docstring).replace('`', '')
 
-google_sections = [
-    '\nArgs:\n',
-    '\nReturns:\n',
-    '\nYields:\n'
-]
+
+class DocstringFormat:
+    name = ''
+    sections = None  # type: List[str]
+
+    def __init__(self):
+        self._sections = [re.compile(s) for s in self.sections]
+
+    def matches(self, docstring: str) -> bool:
+        return any(s.search(docstring) for s in self._sections)
+
+    def parse(self, docstring: str) -> Tuple[Dict[str, str], Optional[str]]:
+        raise NotImplementedError
+
+    def do_parse(self, docstring: str) -> Tuple[Dict[str, Optional[str]], Optional[str]]:
+        params, result = self.parse(docstring)
+        for k, v in params.items():
+            if v is not None:
+                params[k] = clean(v)
+        if result is not None:
+            result = clean(result)
+        return params, result
+
+
+class RestBaseFormat(DocstringFormat):
+    """
+    Base class for all types that convert to restructuredText as a common parsing format
+    """
+    config = Config(napoleon_use_param=True, napoleon_use_rtype=True)
+
+    def to_rest(self, docstring: str) -> str:
+        """
+        Convert a docstring from the native format to rest
+        """
+        raise NotImplementedError
+
+    def parse(self, docstring: str) -> Tuple[Dict[str, str], Optional[str]]:
+        docstring = self.to_rest(docstring)
+        params = OrderedDict()
+        result = None
+
+        try:
+            document = publish_doctree(docstring)
+        except SystemMessage:
+            return params, result
+
+        dom = document.asdom()
+        # print(dom.toprettyxml())
+        for field in dom.getElementsByTagName('field'):
+            field_name = field.getElementsByTagName('field_name')[0]
+            data = field_name.firstChild.data
+            parts = data.strip().split()
+            if len(parts) == 2:
+                kind, name = parts
+                if kind == 'type':
+                    paragraph = field.getElementsByTagName('paragraph')[0]
+                    params[name] = elem_value(paragraph)
+                elif name not in params:
+                    pass
+                    # params[name] = None
+            elif len(parts) == 1 and parts[0] == 'rtype':
+                paragraph = field.getElementsByTagName('paragraph')[0]
+                result = elem_value(paragraph)
+            elif len(parts) == 1 and parts[0] == 'Yields':
+                # FIXME: we need a way to report a warning
+                print("Warning: Yields should be converted to Iterable[]")
+                # items = field.getElementsByTagName('list_item')
+                # if items:
+                #     result = _named_items(items)
+                # else:
+                #     paragraph = field.getElementsByTagName('paragraph')[0]
+                #     result = elem_value(paragraph.getElementsByTagName('emphasis')[0])
+                # result = 'Iterable[' + result + ']'
+            elif len(parts) == 1 and parts[0] == 'returns':
+                items = field.getElementsByTagName('list_item')
+                if items:
+                    result = _named_items(items)
+
+        return params, result
+
+
+class RestFormat(RestBaseFormat):
+    name = 'rest'
+    sections = [
+        r'(\n|^):param ',
+        r'(\n|^):rtype:',
+        r'(\n|^):Yields:'
+    ]
+
+    def to_rest(self, docstring: str) -> str:
+        return _cleandoc(docstring)
+
+
+class NumpyFormat(RestBaseFormat):
+    name = 'numpy'
+    sections = [
+        r'(\n|^)Parameters\n----------\n',
+        r'(\n|^)Returns\n-------\n',
+        r'(\n|^)Yields\n------\n'
+    ]
+
+    def to_rest(self, docstring: str) -> str:
+        return str(NumpyDocstring(_cleandoc(docstring), self.config))
+
+
+class GoogleFormat(RestBaseFormat):
+    name = 'google'
+    sections = [
+        r'(\n|^)Args:\n',
+        r'(\n|^)Returns:\n',
+        r'(\n|^)Yields:\n'
+    ]
+
+    def to_rest(self, docstring: str) -> str:
+        return str(GoogleDocstring(_cleandoc(docstring), self.config))
+
+
+default_format = RestFormat()
+formats = [NumpyFormat(), GoogleFormat(), default_format]
+format_map = {f.name: f for f in formats}
+
+
+# Conversions
+# -----------
 
 # FIXME: currently, if these replacements are successful, it will result in an
 # error because the corresponding type is not imported within the module.
@@ -58,7 +166,7 @@ translations = {
 #     'List', 'Set', 'Dict', 'Iterable', 'Sequence', 'Mapping',
 # ]
 #
-# # Some natural language patterns that we want to support in docstrings.
+# # Some natural language patterns that we want to support in hooks.
 # known_patterns = [
 #     ('list of ?', 'List[?]'),
 #     ('set of ?', 'List[?]'),
@@ -74,6 +182,8 @@ def clean(s):
     return s.strip().replace('\n', ' ')
 
 
+# FIXME: no longer used.
+# we can't add types from docstring without also inserting the import statements
 def standardize_docstring_type(s: str, is_result=False) -> str:
     processed = []
     s = clean(s)
@@ -101,20 +211,18 @@ def standardize_docstring_type(s: str, is_result=False) -> str:
     return s
 
 
-def convert_docstring_type(s: str, line: int) -> Type:
-    s = standardize_docstring_type(s)
-    try:
-        return parse_str_as_type(s, line)
-    except TypeParseError:
-        print("failed to parse: %r" % s)
-        return AnyType()
-    # try:
-    #     return parse_str_as_type(standardize_docstring_type(s), line)
-    # except TypeParseError:
-    #     return AnyType()
+# def convert_docstring_type(s: Optional[str], line: int) -> Type:
+#     if s is None:
+#         return AnyType()
+#     s = standardize_docstring_type(s)
+#     try:
+#         return parse_str_as_type(s, line)
+#     except TypeParseError:
+#         print("failed to parse: %r" % s)
+#         return AnyType()
 
 
-def to_rest(docstring):
+def guess_format(docstring: str) -> DocstringFormat:
     """
     Convert the passed docstring to reStructuredText format.
 
@@ -125,21 +233,13 @@ def to_rest(docstring):
 
     Returns
     -------
-    str
+    DocstringFormat
     """
-    docstring = docstring.replace('`', '')
-    for rest, numpy, google in zip(rest_sections, numpy_sections,
-                                   google_sections):
-        if rest in docstring:
-            return docstring
-        if numpy in docstring:
-            print("Using numpy format")
-            return str(NumpyDocstring(docstring, config))
-        if google in docstring:
-            print("Using google format")
-            return str(GoogleDocstring(docstring, config))
-    print("Unknown format")
-    return docstring
+    docstring = inspect.cleandoc(docstring)
+    for format in formats:
+        if format.matches(docstring):
+            return format
+    return default_format
 
 
 def elem_value(node):
@@ -162,187 +262,53 @@ def _named_items(items):
         return results[0]
 
 
-def parse_rest(docstring: str) -> Tuple[Dict[str, str], str]:
-    params = OrderedDict()
-    result = 'Any'
-
-    try:
-        document = publish_doctree(docstring)
-    except SystemMessage:
-        return params, result
-
-    dom = document.asdom()
-    # print(dom.toprettyxml())
-    for field in dom.getElementsByTagName('field'):
-        field_name = field.getElementsByTagName('field_name')[0]
-        data = field_name.firstChild.data
-        parts = data.strip().split()
-        if len(parts) == 2:
-            kind, name = parts
-            if kind == 'type':
-                paragraph = field.getElementsByTagName('paragraph')[0]
-                params[name] = elem_value(paragraph)
-            elif name not in params:
-                params[name] = 'Any'
-        elif len(parts) == 1 and parts[0] == 'rtype':
-            paragraph = field.getElementsByTagName('paragraph')[0]
-            result = elem_value(paragraph)
-        elif len(parts) == 1 and parts[0] == 'Yields':
-            items = field.getElementsByTagName('list_item')
-            if items:
-                result = _named_items(items)
-            else:
-                paragraph = field.getElementsByTagName('paragraph')[0]
-                result = elem_value(paragraph.getElementsByTagName('emphasis')[0])
-            result = 'Iterable[' + result + ']'
-        elif len(parts) == 1 and parts[0] == 'returns':
-            items = field.getElementsByTagName('list_item')
-            if items:
-                result = _named_items(items)
-
-    return params, result
+# def parse_docstring2(docstring: str, line: int) -> Dict[str, Type]:
+#     docstring = to_rest(docstring)
+#     params, result = parse_rest(docstring)
+#     arg_types = {k: convert_docstring_type(v, line)
+#                  for k, v in params.items() if v is not None}
+#     if result is not None:
+#         arg_types['return'] = convert_docstring_type(result, line)
+#     return arg_types
 
 
-def parse_docstring(docstring: str, line: int) -> CallableType:
-    docstring = to_rest(docstring)
-    # print(docstring)
-    params, result = parse_rest(docstring)
-    return to_callable(params, result, line)
+def _parse_docstring(docstring: str, default_format='auto'
+                     ) -> Tuple[Dict[str, str], Optional[str]]:
+    if default_format == 'auto':
+        format = guess_format(docstring)
+    else:
+        format = format_map[default_format]
+    # print(repr(inspect.cleandoc(docstring)))
+    # print("guessed %s" % format.name)
+    return format.do_parse(docstring)
 
 
-def parse_docstring2(docstring: str, line: int) -> Tuple[Dict[str, Type], Type]:
-    docstring = to_rest(docstring)
-    params, result = parse_rest(docstring)
-    arg_types = {k: convert_docstring_type(v, line) for k, v in params.items()}
-    return_type = convert_docstring_type(result, line)
-    return arg_types, return_type
+def parse_docstring(ctx: DocstringParserContext) -> Dict[str, Type]:
+    # default_return_type = opts.get('default_return_type', None)
+    # format_str = opts.get('format', 'auto')
+    default_return_type = None  # type: Optional[str]
+    format_str = 'auto'
+    params, result = _parse_docstring(ctx.docstring, format_str)
+    arg_types = {k: parse_type_comment(v, ctx.line, ctx.errors)
+                 for k, v in params.items() if v is not None}
+    if result is not None:
+        arg_types['return'] = parse_type_comment(result, ctx.line, ctx.errors)
+    elif ctx.docstring and default_return_type:
+        arg_types['return'] = parse_type_comment(default_return_type, ctx.line, ctx.errors)
+    return arg_types
 
 
-def to_callable(params, result, line: int) -> CallableType:
-    arg_types = []
-    arg_kinds = []
-    arg_names = []
-    for name, type_str in params.items():
-        if name.startswith('**'):
-            kind = nodes.ARG_STAR2
-            name = name[2:]
-        if name.startswith('*'):
-            kind = nodes.ARG_STAR
-            name = name[1:]
-        else:
-            kind = nodes.ARG_POS
-
-        arg = convert_docstring_type(type_str, line)
-        # print(x.toprettyxml())
-        # print(name)
-        # print('%s --> %s' % (type_str, arg))
-        arg_types.append(arg)
-        arg_kinds.append(kind)
-        arg_names.append(name)
-
-    ret_type = convert_docstring_type(result, line)
-
-    return CallableType(arg_types,
-                        arg_kinds,
-                        arg_names,
-                        ret_type, None,
-                        is_ellipsis_args=False)
+class MypydocPlugin(Plugin):
+    def get_docstring_parser_hook(self):
+        return parse_docstring
 
 
-class DocParser(mypy.parse.Parser):
-    def parse_docstring(self, docstring: str, line: int) -> CallableType:
-        return parse_docstring(docstring, line)
+def plugin(version):
+    return MypydocPlugin
 
-    # overrides that supports sparse updates
-    def update_signature(self, func_name: str, is_method: bool,
-                         args: List[nodes.Argument], sig: CallableType,
-                         line: int, column: int) -> CallableType:
-        # sig is either parsed from 'type' comments or docstrings
-
-        # NOTE:
-        # Multi-line comment annotations currently only work when using the
-        # --fast-parser command line option. This is not enabled by default
-        # because the option isn’t supported on Windows yet
-        if is_method:
-            fargs = args[1:]
-        else:
-            fargs = args
-        # parsed from function def:
-        arg_kinds = [arg.kind for arg in fargs]
-        arg_types = [arg.variable.type for arg in fargs]
-        arg_names = [arg.variable.name() for arg in fargs]
-
-        print("real types: %s" % arg_types)
-        print("doc types:  %s" % sig.arg_types)
-        print("real kinds: %s" % arg_kinds)
-        print("doc kinds:  %s" % sig.arg_kinds)
-        print("real names: %s" % arg_names)
-        print("doc names:  %s" % sig.arg_names)
-        print("-" * 40)
-        # if all(sig.arg_names) and arg_names:
-        #     # fill in missing arguments
-        #     override_kinds = dict(zip(sig.arg_names, sig.arg_kinds))
-        #     override_types = dict(zip(sig.arg_names, sig.arg_types))
-        #     # print("Overrides")
-        #     # for name, typ in zip(sig.arg_names, sig.arg_types):
-        #     #     print("   %s: %s" % (name, typ))
-        #
-        #     sig.arg_kinds = [override_kinds.get(name, kind)
-        #                      for name, kind in zip(arg_names, arg_kinds)]
-        #     sig.arg_types = [override_types.get(name, typ)
-        #                      for name, typ in zip(arg_names, arg_types)]
-
-        for name, real_kind, real_type, merged_kind, merged_type in zip(
-                arg_names, arg_kinds, arg_types, sig.arg_kinds, sig.arg_types):
-            print(name)
-            print("  kind: %s --> %s" % (real_kind, merged_kind))
-            print("  type: %s --> %s" % (real_type, merged_type))
-        print("=" * 40)
-        return super(DocParser, self).update_signature(func_name, is_method, args,
-                                                       sig, line, column)
-        #
-        # if sig.is_ellipsis_args:
-        #     # When we encounter an ellipsis, fill in the arg_types with
-        #     # a bunch of AnyTypes, emulating Callable[..., T]
-        #     arg_types = [AnyType()] * len(arg_kinds)  # type: List[Type]
-        #     return CallableType(
-        #         arg_types,
-        #         arg_kinds,
-        #         arg_names,
-        #         sig.ret_type,
-        #         None,
-        #         line=line,
-        #         column=column)
-        # elif is_method and len(sig.arg_kinds) < len(arg_kinds):
-        #     self.check_argument_kinds(arg_kinds,
-        #                               [nodes.ARG_POS] + sig.arg_kinds,
-        #                               line, column)
-        #     # Add implicit 'self' argument to signature.
-        #     first_arg = [AnyType()]  # type: List[Type]
-        #     return CallableType(
-        #         first_arg + sig.arg_types,
-        #         arg_kinds,
-        #         arg_names,
-        #         sig.ret_type,
-        #         None,
-        #         line=line,
-        #         column=column)
-        # else:
-        #     self.check_argument_kinds(arg_kinds, sig.arg_kinds, line, column)
-        #     return CallableType(
-        #         sig.arg_types,
-        #         arg_kinds,
-        #         arg_names,
-        #         sig.ret_type,
-        #         None,
-        #         line=line,
-        #         column=column)
-
-# mypy.parse.Parser = DocParser
-
-import mypy.docstrings
-mypy.docstrings.parse_docstring = parse_docstring2
 
 if __name__ == '__main__':
     from mypy.main import main
+    import mypy.hooks
+    mypy.hooks.docstring_parser = parse_docstring
     main(None)
