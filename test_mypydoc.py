@@ -51,7 +51,7 @@ def test_custom_type():
     ]
 
 
-@pytest.mark.skip('only pep484 docstrings are supported')
+@pytest.mark.skip(reason='only pep484 docstrings are supported')
 def test_transform_union():
     assert parse('''
 :param union_or: type union using 'or'
