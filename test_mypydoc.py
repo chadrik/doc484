@@ -1,23 +1,32 @@
-from mypydoc import guess_format, _parse_docstring, RestFormat, standardize_docstring_type
+from mypydoc import guess_format, parse_docstring, RestFormat, YIELDS_ERROR, NAMED_ITEMS_ERROR
 
 from typing import List
+
+from mypy.errors import Errors
+from mypy.plugin import DocstringParserContext
+from mypy.types import AnyType
 
 import pytest
 
 
-class CustomType(object):
-    pass
+def get_format(docstring):
+    format = guess_format(docstring)
+    return format(0, Errors())
 
 
-rest_format = RestFormat()
-
-
-def parse(docstring, format=rest_format):
+def parse(docstring):
+    format = get_format(docstring)
     params, result = format.do_parse(docstring)
-    conformed = [(k, v) for k, v in params.items()]
+    conformed = [(k, tuple(v)) for k, v in params.items()]
     if result is not None:
-        conformed.append(('return', result))
+        conformed.append(('return', tuple(result)))
     return conformed
+
+
+def convert(docstring, line=0):
+    ctx = DocstringParserContext(docstring, line, Errors())
+    ctx.errors.file = 'dummypath'
+    return ctx, parse_docstring(ctx)
 
 
 def test_basic():
@@ -26,20 +35,24 @@ def test_basic():
 :type path: str
 :param basic_type: basic type description
 :type basic_type: bool''') == [
-        ('path', 'str'),
-        ('basic_type', 'bool')
+        ('path', ('str', 2)),
+        ('basic_type', ('bool', 4))
     ]
 
 
-def test_pep484():
+def test_complex():
     assert parse('''
-:param pep484_type: valid pep484 type description
-:type pep484_type: Union[Dict[str, int], str]
-:param multiline_pep484_type: pep484 type description spanning multiple lines
-:type multiline_pep484_type: Union[Dict[str,int],
-    List[Tuple[str, int]]]''') == [
-        ('pep484_type', 'Union[Dict[str, int], str]'),
-        ('multiline_pep484_type', 'Union[Dict[str,int], List[Tuple[str, int]]]')
+:param complex: valid pep484 type description
+:type complex: Union[Dict[str, int], str]
+:param multiline: pep484 type description spanning multiple lines
+:type multiline: Union[Dict[str,int],
+    List[Tuple[str, int]]]
+:param  whitespace: leading and trailing whitespace
+:type  whitespace:   Union[Dict[str, int], str]   
+    ''') == [
+        ('complex', ('Union[Dict[str, int], str]', 2)),
+        ('multiline', ('Union[Dict[str,int], List[Tuple[str, int]]]', 4)),
+        ('whitespace', ('Union[Dict[str, int], str]', 7))
     ]
 
 
@@ -47,11 +60,145 @@ def test_custom_type():
     assert parse('''
 :param custom_type: The :class:`CustomType` instance to wrap
 :type custom_type: CustomType''') == [
-        ('custom_type', 'CustomType')
+        ('custom_type', ('CustomType', 2))
     ]
 
 
-@pytest.mark.skip(reason='only pep484 docstrings are supported')
+def test_invalid_types():
+    s = '''
+:param union_or: type union using 'or'
+:type union_or: int or float or str
+:param union_pipe: type union using '|'
+:type union_pipe: int | float|str'''
+    format = get_format(s)
+    ctx, result = convert(s)
+    assert ctx.errors.messages() == [
+        'dummypath:2: error: invalid type comment or annotation',
+        'dummypath:4: error: invalid type comment or annotation'
+    ]
+
+    assert list(result.keys()) == ['union_or', 'union_pipe']
+    assert isinstance(result['union_or'], AnyType)
+    assert isinstance(result['union_pipe'], AnyType)
+
+
+def test_missing_args():
+    assert parse('''
+:param missing_type: parameter that has no type pair
+:type  missing_param: bool''') == [
+        ('missing_param', ('bool', 2)),
+    ]
+
+
+def test_returns():
+    assert parse('''
+:returns: simple return value
+:rtype: bool''') == [
+        ('return', ('bool', 2)),
+    ]
+
+
+def test_numpydoc():
+    s = '''
+        One line summary.
+
+        Extended description.
+
+        Parameters
+        ----------
+        arg1 : Any
+            Description of `arg1`
+        arg2 : Union[str, int]
+            Description of `arg2`
+
+        Returns
+        -------
+        str
+            Description of return value.
+    '''
+    format = get_format(s)
+    assert format.name == 'numpy'
+    assert format.to_rest(s) == '''\
+One line summary.
+
+Extended description.
+
+:param arg1: Description of arg1
+:type arg1: Any
+:param arg2: Description of arg2
+:type arg2: Union[str, int]
+
+:returns: Description of return value.
+:rtype: str
+'''
+
+
+def test_numpydoc_yields():
+    s = '''
+        Yields
+        ------
+        str
+            Description of return value.
+    '''
+    format = get_format(s)
+    assert format.name == 'numpy'
+    assert format.to_rest(s) == '''\
+:Yields: *str* -- Description of return value.
+'''
+    ctx, result = convert(s)
+    # note: warning is misspelled in mypy
+    assert ctx.errors.messages() == [
+        'dummypath:1: waring: %s' % YIELDS_ERROR
+    ]
+
+
+def test_numpydoc_named_result():
+    s = '''
+        Returns
+        -------
+        result1: str
+            Description of first item
+    '''
+    format = get_format(s)
+    assert format.name == 'numpy'
+    assert format.to_rest(s) == '''\
+:returns: **result1** -- Description of first item
+:rtype: str
+'''
+    ctx, result = convert(s)
+    assert ctx.errors.messages() == []
+    assert parse(s) == [
+        ('return', ('str', 2))
+    ]
+
+
+def test_numpydoc_tuple_result():
+    s = '''
+        Returns
+        -------
+        result1: str
+            Description of first item
+        result2: bool
+            Description of second item
+    '''
+    format = get_format(s)
+    assert format.name == 'numpy'
+    assert format.to_rest(s) == '''\
+:returns: * **result1** (*str*) -- Description of first item
+          * **result2** (*bool*) -- Description of second item
+'''
+    ctx, result = convert(s)
+    # note: warning is misspelled in mypy
+    assert ctx.errors.messages() == [
+        'dummypath:1: waring: %s' % NAMED_ITEMS_ERROR
+    ]
+
+    # print(NumpyDocstring(docstring))
+# :returns: A buffered writable file descriptor
+# :rtype: BufferedFileStorage
+
+
+@pytest.mark.skip('only pep484 docstrings are supported')
 def test_transform_union():
     assert parse('''
 :param union_or: type union using 'or'
@@ -81,25 +228,8 @@ def test_transform_optional():
     ]
 
 
-def test_missing():
-    assert parse('''
-:param missing_type: parameter that has no type pair
-:type  missing_param: bool''') == [
-        # ('missing_type', 'Any'),  # FIXME: might be best to exclude this and rely on update_signature
-        ('missing_param', 'bool'),
-    ]
-
-
-def test_returns():
-    assert parse('''
-:returns: simple return value
-:rtype: bool''') == [
-        ('return', 'bool'),
-    ]
-
-
 @pytest.mark.skip('only pep484 docstrings are supported')
-def test_yields_with_description():
+def test_transform_yields_with_description():
     """Test output produced when using Yields in numpy or google format
     """
     assert parse('''
@@ -109,7 +239,7 @@ def test_yields_with_description():
 
 
 @pytest.mark.skip('only pep484 docstrings are supported')
-def test_yields_without_description():
+def test_transform_yields_without_description():
     """Test output produced when using Yields in numpy or google format
     """
     assert parse('''
@@ -119,7 +249,7 @@ def test_yields_without_description():
 
 
 @pytest.mark.skip('only pep484 docstrings are supported')
-def test_yields_tuple():
+def test_transform_yields_tuple():
     """Test output produced when using named values in a Yields section in
     numpy or google format"""
     assert parse('''
@@ -130,6 +260,7 @@ def test_yields_tuple():
     ]
 
 
+@pytest.mark.skip('only pep484 docstrings are supported')
 def test_returns_tuple():
     """Test output produced when using named values in a Returns section in
     numpy or google format"""
@@ -139,92 +270,6 @@ def test_returns_tuple():
 ''') == [
         ('return', 'Tuple[str, bool]')
     ]
-
-
-def test_numpydoc():
-    s = '''
-        One line summary.
-
-        Extended description.
-
-        Parameters
-        ----------
-        arg1 : Any
-            Description of `arg1`
-        arg2 : Union[str, int]
-            Description of `arg2`
-
-        Returns
-        -------
-        str
-            Description of return value.
-    '''
-    format = guess_format(s)
-    assert format.name == 'numpy'
-    assert format.to_rest(s) == '''\
-One line summary.
-
-Extended description.
-
-:param arg1: Description of arg1
-:type arg1: Any
-:param arg2: Description of arg2
-:type arg2: Union[str, int]
-
-:returns: Description of return value.
-:rtype: str
-'''
-
-
-def test_numpydoc_yields():
-    s = '''
-        Yields
-        ------
-        str
-            Description of return value.
-    '''
-    format = guess_format(s)
-    assert format.name == 'numpy'
-    assert format.to_rest(s) == '''\
-:Yields: *str* -- Description of return value.
-'''
-
-
-def test_numpydoc_tuple_result():
-    s = '''
-        Returns
-        -------
-        result1: str
-            Description of first item
-        result2: bool
-            Description of second item
-    '''
-    format = guess_format(s)
-    assert format.name == 'numpy'
-    assert format.to_rest(s) == '''\
-:returns: * **result1** (*str*) -- Description of first item
-          * **result2** (*bool*) -- Description of second item
-'''
-
-
-def test_numpydoc_named_result():
-    s = '''
-        Returns
-        -------
-        result1: str
-            Description of first item
-    '''
-    format = guess_format(s)
-    assert format.name == 'numpy'
-    assert format.to_rest(s) == '''\
-:returns: **result1** -- Description of first item
-:rtype: str
-'''
-
-    # print(NumpyDocstring(docstring))
-# :returns: A buffered writable file descriptor
-# :rtype: BufferedFileStorage
-
 
 def myfunc_test1(arg1,
           arg2,
