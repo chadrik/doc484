@@ -1,5 +1,6 @@
 import re
 import inspect
+import logging
 from collections import OrderedDict
 
 from typing import List, Tuple, Dict, NamedTuple, Optional, TYPE_CHECKING, Type as Class
@@ -11,12 +12,6 @@ import docutils.nodes
 from docutils.core import publish_doctree
 from docutils.utils import SystemMessage
 
-from mypy.plugin import Plugin, DocstringParserContext
-from mypy.errors import Errors
-from mypy.fastparse import parse_type_comment
-from mypy.types import Type
-
-
 YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
 NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
 
@@ -26,8 +21,10 @@ Arg = NamedTuple('Arg', [
     ('line', int),
 ])
 
+_logger = logging.getLogger(__name__)
 
-def _cleandoc(docstring: str) -> str:
+
+def _cleandoc(docstring):
     return inspect.cleandoc(docstring).replace('`', '')
 
 
@@ -43,24 +40,77 @@ class DocstringFormat:
     name = ''
     sections = None  # type: List[str]
 
-    def __init__(self, line: int, errors: Errors):
-        self.errors = errors
+    def __init__(self, line, logger=None):
+        """
+        Parameters
+        ----------
+        line : int
+        logger 
+        """
+        self.logger = logger or _logger
         self.line = line
 
-    def warning(self, message: str, line: int):
-        self.errors.report(line + self.line, 0, message=message, severity='waring')
+    def warning(self, message, line):
+        """
+        Parameters
+        ----------
+        message : str
+        line : int
+        """
+        extra = {
+            'line': line + self.line,
+            'column': 0
+        }
+        self.logger.warning(message, extra=extra)
 
-    def error(self, message: str, line: int):
-        self.errors.report(line + self.line, 0, message=message, severity='error')
+    def error(self, message, line):
+        """
+        Parameters
+        ----------
+        message : str
+        line : int
+        """
+        extra = {
+            'line': line + self.line,
+            'column': 0
+        }
+        self.logger.error(message, extra=extra)
 
     @classmethod
-    def matches(cls, docstring: str) -> bool:
+    def matches(cls, docstring):
+        """
+        Parameters
+        ----------
+        docstring : str
+
+        Returns
+        -------
+        bool
+        """
         return any(s.search(docstring) for s in cls.sections)
 
-    def parse(self, docstring: str) -> Tuple[Dict[str, str], Optional[Arg]]:
+    def parse(self, docstring):
+        """
+        Parameters
+        ----------
+        docstring : str
+
+        Returns
+        -------
+        Tuple[Dict[str, Arg], Optional[Arg]]
+        """
         raise NotImplementedError
 
-    def do_parse(self, docstring: str) -> Tuple[Dict[str, Optional[str]], Optional[str]]:
+    def do_parse(self, docstring):
+        """
+        Parameters
+        ----------
+        docstring : str
+
+        Returns
+        -------
+        Tuple[Dict[str, Optional[str]], Optional[str]]
+        """
         params, result = self.parse(docstring)
         # for k, v in params.items():
         #     if v is not None:
@@ -76,26 +126,30 @@ class RestBaseFormat(DocstringFormat):
     """
     config = Config(napoleon_use_param=True, napoleon_use_rtype=True)
 
-    def to_rest(self, docstring: str) -> str:
+    def to_rest(self, docstring):
         """
         Convert a docstring from the native format to rest
+
+        Parameters
+        ----------
+        docstring : str
+
+        Returns
+        -------
+        str
         """
         raise NotImplementedError
 
-    def _named_items_to_tuple(self, items, line):
-        results = []
-        for item in items:
-            paragraph = item.traverse(condition=docutils.nodes.paragraph)[0]
-            results.append(
-                Arg(_clean_type(paragraph.traverse(condition=docutils.nodes.emphasis)[0].astext()),
-                    paragraph.line))
-        if len(results) > 1:
-            # return 'Tuple[' + ', '.join(results) + ']'
-            self.warning(NAMED_ITEMS_ERROR, line)
-        else:
-            return results[0]
+    def parse(self, docstring):
+        """
+        Parameters
+        ----------
+        docstring : str
 
-    def parse(self, docstring: str) -> Tuple[Dict[str, str], Optional[Arg]]:
+        Returns
+        -------
+        Tuple[Dict[str, Arg], Optional[Arg]]
+        """
         docstring = self.to_rest(docstring)
         params = OrderedDict()
         result = None  # type: Arg
@@ -114,34 +168,20 @@ class RestBaseFormat(DocstringFormat):
                 items = field.traverse(condition=docutils.nodes.list_item)
                 if items:
                     # special case to print warning for named return values
-                    # tmp = self._named_items_to_tuple(items, field.line)
-                    # assert tmp is None
                     self.warning(NAMED_ITEMS_ERROR, field.line)
-            elif len(parts) in (1, 2):
-                print(parts)
+            elif len(parts) == 1 or (len(parts) == 2 and parts[0] == 'type'):
                 paragraph = field.traverse(condition=docutils.nodes.paragraph)[0]
                 arg = Arg(_clean_type(paragraph.astext()), paragraph.line)
                 if len(parts) == 2:
-                    # e.g. type foo: xxxx
+                    # e.g. :type foo: xxxx
                     kind, name = parts
-                    if kind == 'type':
-                        params[name] = arg
-                        # elif name not in params:
-                        #     params[name] = None
+                    params[name] = arg
                 elif len(parts) == 1 and parts[0] == 'rtype':
-                    # e.g. rtype: xxxx
-                    print(arg)
+                    # e.g. :rtype: xxxx
                     result = arg
                 elif len(parts) == 1 and parts[0] == 'Yields':
-                    paragraph = field.traverse(condition=docutils.nodes.paragraph)[0]
+                    # e.g. converted from numpy or google format
                     self.warning(YIELDS_ERROR, paragraph.line)
-                    # items = field.getElementsByTagName('list_item')
-                    # if items:
-                    #     result = _named_items_to_tuple(items)
-                    # else:
-                    #     paragraph = field.getElementsByTagName('paragraph')[0]
-                    #     result = _elem_value(paragraph.getElementsByTagName('emphasis')[0])
-                    # result = 'Iterator[' + result + ']'
 
         return params, result
 
@@ -154,7 +194,7 @@ class RestFormat(RestBaseFormat):
         r'(\n|^):Yields:'
     )
 
-    def to_rest(self, docstring: str) -> str:
+    def to_rest(self, docstring):
         return _cleandoc(docstring)
 
 
@@ -166,7 +206,7 @@ class NumpyFormat(RestBaseFormat):
         r'(\n|^)Yields\n------\n'
     )
 
-    def to_rest(self, docstring: str) -> str:
+    def to_rest(self, docstring):
         return str(NumpyDocstring(_cleandoc(docstring), self.config))
 
 
@@ -178,7 +218,7 @@ class GoogleFormat(RestBaseFormat):
         r'(\n|^)Yields:\n'
     )
 
-    def to_rest(self, docstring: str) -> str:
+    def to_rest(self, docstring):
         return str(GoogleDocstring(_cleandoc(docstring), self.config))
 
 
@@ -225,7 +265,7 @@ union_regex = re.compile(r'(?:\s+or\s+)|(?:\s*\|\s*)')
 optional_regex = re.compile(r'(.*)(,\s*optional\s*$)')
 
 
-def standardize_docstring_type(s: str, is_result=False) -> str:
+def standardize_docstring_type(s, is_result=False):
     processed = []
     s = _clean_type(s)
 
@@ -251,10 +291,10 @@ def standardize_docstring_type(s: str, is_result=False) -> str:
         s = 'Optional[' + s + ']'
     return s
 
+
 # ----
 
-
-def guess_format(docstring: str) -> DocstringFormat:
+def guess_format(docstring):
     """
     Convert the passed docstring to reStructuredText format.
 
@@ -274,47 +314,19 @@ def guess_format(docstring: str) -> DocstringFormat:
     return default_format
 
 
-def _parse_docstring(docstring: str, line: int=0, errors: Optional[Errors]=None,
-                     default_format='auto'
-                     ) -> Tuple[Dict[str, str], Optional[Arg]]:
+def parse_docstring(docstring, line=0, logger=None, default_format='auto'):
+    """
+    Parameters
+    ----------
+    docstring : str
+    line : int
+
+    Returns
+    -------
+    Tuple[Dict[str, Arg], Optional[Arg]]
+    """
     if default_format == 'auto':
         format = guess_format(docstring)
     else:
         format = format_map[default_format]
-    if errors is None:
-        errors = Errors()
-    return format(line, errors).do_parse(docstring)
-
-
-# Entry Points
-# ------------
-
-def parse_docstring(ctx: DocstringParserContext) -> Dict[str, Type]:
-    # default_return_type = opts.get('default_return_type', None)
-    # format_str = opts.get('format', 'auto')
-    default_return_type = None  # type: Optional[str]
-    format_str = 'auto'
-    params, result = _parse_docstring(ctx.docstring, ctx.line, ctx.errors, format_str)
-    arg_types = {k: parse_type_comment(v.type, ctx.line + v.line, ctx.errors)
-                 for k, v in params.items() if v is not None}
-    if result is not None:
-        arg_types['return'] = parse_type_comment(result.type, ctx.line + result.line, ctx.errors)
-    elif ctx.docstring and default_return_type:
-        arg_types['return'] = parse_type_comment(default_return_type, ctx.line, ctx.errors)
-    return arg_types
-
-
-class MypydocPlugin(Plugin):
-    def get_docstring_parser_hook(self):
-        return parse_docstring
-
-
-def plugin(version) -> Class[Plugin]:
-    return MypydocPlugin
-
-
-if __name__ == '__main__':
-    from mypy.main import main
-    import mypy.hooks
-    mypy.hooks.docstring_parser = parse_docstring
-    main(None)
+    return format(line, logger).do_parse(docstring)

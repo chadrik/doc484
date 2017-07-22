@@ -1,17 +1,15 @@
-from mypydoc import guess_format, parse_docstring, RestFormat, YIELDS_ERROR, NAMED_ITEMS_ERROR
+from mypydoc import guess_format, parse_docstring, YIELDS_ERROR, NAMED_ITEMS_ERROR
 
 from typing import List
 
-from mypy.errors import Errors
-from mypy.plugin import DocstringParserContext
-from mypy.types import AnyType
+from mock import MagicMock, call
 
 import pytest
 
 
 def get_format(docstring):
     format = guess_format(docstring)
-    return format(0, Errors())
+    return format(0, MagicMock())
 
 
 def parse(docstring):
@@ -24,9 +22,8 @@ def parse(docstring):
 
 
 def convert(docstring, line=0):
-    ctx = DocstringParserContext(docstring, line, Errors())
-    ctx.errors.file = 'dummypath'
-    return ctx, parse_docstring(ctx)
+    logger = MagicMock()
+    return logger, parse_docstring(docstring, line, logger)
 
 
 def test_basic():
@@ -49,10 +46,14 @@ def test_complex():
     List[Tuple[str, int]]]
 :param  whitespace: leading and trailing whitespace
 :type  whitespace:   Union[Dict[str, int], str]   
+:param leading_newline: leading newline
+:type leading_newline:
+    Union[Dict[str, int], str]   
     ''') == [
         ('complex', ('Union[Dict[str, int], str]', 2)),
         ('multiline', ('Union[Dict[str,int], List[Tuple[str, int]]]', 4)),
-        ('whitespace', ('Union[Dict[str, int], str]', 7))
+        ('whitespace', ('Union[Dict[str, int], str]', 7)),
+        ('leading_newline', ('Union[Dict[str, int], str]', 10))
     ]
 
 
@@ -62,24 +63,6 @@ def test_custom_type():
 :type custom_type: CustomType''') == [
         ('custom_type', ('CustomType', 2))
     ]
-
-
-def test_invalid_types():
-    s = '''
-:param union_or: type union using 'or'
-:type union_or: int or float or str
-:param union_pipe: type union using '|'
-:type union_pipe: int | float|str'''
-    format = get_format(s)
-    ctx, result = convert(s)
-    assert ctx.errors.messages() == [
-        'dummypath:2: error: invalid type comment or annotation',
-        'dummypath:4: error: invalid type comment or annotation'
-    ]
-
-    assert list(result.keys()) == ['union_or', 'union_pipe']
-    assert isinstance(result['union_or'], AnyType)
-    assert isinstance(result['union_pipe'], AnyType)
 
 
 def test_missing_args():
@@ -147,8 +130,8 @@ def test_numpydoc_yields():
 '''
     ctx, result = convert(s)
     # note: warning is misspelled in mypy
-    assert ctx.errors.messages() == [
-        'dummypath:1: waring: %s' % YIELDS_ERROR
+    assert ctx.warning.call_args_list == [
+        call(YIELDS_ERROR, extra={'column': 0, 'line': 1})
     ]
 
 
@@ -166,7 +149,7 @@ def test_numpydoc_named_result():
 :rtype: str
 '''
     ctx, result = convert(s)
-    assert ctx.errors.messages() == []
+    assert ctx.error.call_args_list == []
     assert parse(s) == [
         ('return', ('str', 2))
     ]
@@ -189,13 +172,9 @@ def test_numpydoc_tuple_result():
 '''
     ctx, result = convert(s)
     # note: warning is misspelled in mypy
-    assert ctx.errors.messages() == [
-        'dummypath:1: waring: %s' % NAMED_ITEMS_ERROR
+    assert ctx.warning.call_args_list == [
+        call(NAMED_ITEMS_ERROR, extra={'column': 0, 'line': 1})
     ]
-
-    # print(NumpyDocstring(docstring))
-# :returns: A buffered writable file descriptor
-# :rtype: BufferedFileStorage
 
 
 @pytest.mark.skip('only pep484 docstrings are supported')
@@ -270,37 +249,3 @@ def test_returns_tuple():
 ''') == [
         ('return', 'Tuple[str, bool]')
     ]
-
-def myfunc_test1(arg1,
-          arg2,
-          arg3=True,
-          arg4='string',
-          arg5=None  # type: List[str]
-          ):
-    pass
-
-
-def myfunc_test2(arg1,
-          arg2,
-          arg3=True,
-          arg4='string',
-          arg5: List[str] = None
-          ):
-    pass
-
-
-def myfunc_test3(arg1,
-          arg2,
-          arg3=True,
-          arg4='string',
-          arg5=None
-          ):
-    """
-    :param arg1:
-    :param arg2:
-    :param arg3:
-    :param arg4:
-    :param arg5:
-    :type arg5: tuple[str]
-    """
-    pass
