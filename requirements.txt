@@ -1,0 +1,3 @@
+sphinx
+typing
+-e git://github.com/chadrik/redbaron.git@338ae268ada6bc7cdb913f88d3fbf52eee96b84f#egg=redbaron
