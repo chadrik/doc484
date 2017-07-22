@@ -1,7 +1,7 @@
 from __future__ import absolute_import, print_function
 
 from plugin import parse_docstring, Logger
-from mypydoc import guess_format
+from doc484 import guess_format
 
 from mypy.errors import Errors
 from mypy.plugin import DocstringParserContext

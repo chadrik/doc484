@@ -1,4 +1,4 @@
-from mypydoc import guess_format, parse_docstring, YIELDS_ERROR, NAMED_ITEMS_ERROR
+from doc484 import guess_format, parse_docstring, YIELDS_ERROR, NAMED_ITEMS_ERROR
 
 from typing import List
 
@@ -39,9 +39,9 @@ def test_basic():
 
 def test_complex():
     assert parse('''
-:param complex: valid pep484 type description
+:param complex: valid doc484 type description
 :type complex: Union[Dict[str, int], str]
-:param multiline: pep484 type description spanning multiple lines
+:param multiline: doc484 type description spanning multiple lines
 :type multiline: Union[Dict[str,int],
     List[Tuple[str, int]]]
 :param  whitespace: leading and trailing whitespace
@@ -177,7 +177,7 @@ def test_numpydoc_tuple_result():
     ]
 
 
-@pytest.mark.skip('only pep484 docstrings are supported')
+@pytest.mark.skip('only doc484 docstrings are supported')
 def test_transform_union():
     assert parse('''
 :param union_or: type union using 'or'
@@ -189,7 +189,7 @@ def test_transform_union():
     ]
 
 
-@pytest.mark.skip('only pep484 docstrings are supported')
+@pytest.mark.skip('only doc484 docstrings are supported')
 def test_transform_lower_dict():
     assert parse('''
 :param lower_dict: lower-case dict (pycharm style)
@@ -198,7 +198,7 @@ def test_transform_lower_dict():
     ]
 
 
-@pytest.mark.skip('only pep484 docstrings are supported')
+@pytest.mark.skip('only doc484 docstrings are supported')
 def test_transform_optional():
     assert parse('''
 :param optional: optional parameter
@@ -207,7 +207,7 @@ def test_transform_optional():
     ]
 
 
-@pytest.mark.skip('only pep484 docstrings are supported')
+@pytest.mark.skip('only doc484 docstrings are supported')
 def test_transform_yields_with_description():
     """Test output produced when using Yields in numpy or google format
     """
@@ -217,7 +217,7 @@ def test_transform_yields_with_description():
     ]
 
 
-@pytest.mark.skip('only pep484 docstrings are supported')
+@pytest.mark.skip('only doc484 docstrings are supported')
 def test_transform_yields_without_description():
     """Test output produced when using Yields in numpy or google format
     """
@@ -227,7 +227,7 @@ def test_transform_yields_without_description():
     ]
 
 
-@pytest.mark.skip('only pep484 docstrings are supported')
+@pytest.mark.skip('only doc484 docstrings are supported')
 def test_transform_yields_tuple():
     """Test output produced when using named values in a Yields section in
     numpy or google format"""
@@ -239,7 +239,7 @@ def test_transform_yields_tuple():
     ]
 
 
-@pytest.mark.skip('only pep484 docstrings are supported')
+@pytest.mark.skip('only doc484 docstrings are supported')
 def test_returns_tuple():
     """Test output produced when using named values in a Returns section in
     numpy or google format"""

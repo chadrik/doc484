@@ -1,6 +1,6 @@
 from __future__ import absolute_import, print_function
 
-from mypydoc import parse_docstring as _parse_docstring
+from doc484 import parse_docstring as _parse_docstring
 
 from mypy.plugin import Plugin, DocstringParserContext
 from mypy.errors import Errors
