@@ -28,5 +28,5 @@ To use the converter:
 
 ```
 pip install -r requirements.txt
-python ./docs-to-comments.py /path/to/file
+python ./docs-to-comments.py -h
 ```
