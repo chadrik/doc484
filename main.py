@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from __future__ import absolute_import, print_function
 from redbaron import RedBaron
 import sys
@@ -11,14 +12,12 @@ import doc484
 TYPE_REG = re.compile('\s*#\s*type:.*')
 
 
-def _get_type(typ):
-    return 'Any' if typ is None else typ.type
+def _get_type(typ, default='Any'):
+    return default if typ is None else typ.type
 
 
-def convert_file(path, dry_run=False):
-    print(path)
-    with open(path, 'r') as f:
-        red = RedBaron(f.read())
+def convert_string(contents, default_return='Any'):
+    red = RedBaron(contents)
     for obj in red.find_all('def'):
         doc_node = None
         type_comment = None
@@ -37,41 +36,61 @@ def convert_file(path, dry_run=False):
         if doc_node is not None:
             s = doc_node.to_python()
             types = []
-            params, result = doc484.parse_docstring(s)
+            line = doc_node.absolute_bounding_box.top_left.line
+            params, result = doc484.parse_docstring(s, line=line)
             if obj.arguments:
                 for i, arg in enumerate(obj.arguments):
                     typ = params.get(arg.name.value)
                     # we can't *easily* tell from here if the current func is a
                     # method, but the below is a pretty good assurance that we can skip
-                    # the arg
+                    # the current arg.
+                    # there is nothing wrong with including self or cls, but pep484
+                    # supports omitting it for brevity.
                     if i == 0 and arg.name.value in {'self', 'cls'} and typ is None:
                         continue
                     types.append(_get_type(typ))
 
-            typestr = '# type: (%s) -> %s' % (', '.join(types), _get_type(result))
+            typestr = '# type: (%s) -> %s' % (', '.join(types),
+                                              _get_type(result, default_return))
             if type_comment is not None and TYPE_REG.match(type_comment.value):
                 type_comment.value = typestr
             else:
                 obj.insert(0, typestr)
+    return red.dumps()
+
+
+def convert_file(path, dry_run=False, default_return='Any'):
+    print(path)
+    with open(path, 'r') as f:
+        output = convert_string(f.read(), default_return=default_return)
+
     if dry_run:
-        print(red.dumps())
+        print(output)
     else:
         with open(path, 'w') as f:
-            f.write(red.dumps())
+            f.write(output)
 
 
-def convert(path, dry_run=False):
+def convert(path, dry_run=False, default_return='Any'):
     if os.path.isdir(path):
         for root, dirs, files in os.walk(path, topdown=False):
             for name in files:
                 if name.endswith('.py'):
                     fullpath = os.path.join(root, name)
-                    convert_file(fullpath, dry_run=dry_run)
+                    convert_file(fullpath, dry_run=dry_run,
+                                 default_return=default_return)
     else:
-        convert_file(path, dry_run=dry_run)
+        convert_file(path, dry_run=dry_run, default_return=default_return)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("path", help="Path to convert")
+    parser.add_argument("--dry-run",
+                        help="Don't convert files, just print results",
+                        action="store_true")
+    parser.add_argument("--default-return",
+                        help="Return value to use when docs are present, but not return "
+                             "value is specified",
+                        default='Any')
     args = parser.parse_args()
-    convert(args.path)
+    convert(args.path, dry_run=args.dry_run, default_return=args.default_return)

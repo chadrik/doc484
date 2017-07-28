@@ -14,7 +14,7 @@ def get_format(docstring):
 
 def parse(docstring):
     format = get_format(docstring)
-    params, result = format.do_parse(docstring)
+    params, result = format.parse(docstring)
     conformed = [(k, tuple(v)) for k, v in params.items()]
     if result is not None:
         conformed.append(('return', tuple(result)))

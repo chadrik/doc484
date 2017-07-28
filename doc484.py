@@ -9,8 +9,11 @@ from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
 from sphinx.ext.napoleon import Config
 
 import docutils.nodes
-from docutils.core import publish_doctree
+from docutils.core import Publisher
+from docutils import io
 from docutils.utils import SystemMessage
+from docutils.nodes import Element
+from docutils.readers.standalone import Reader as _Reader
 
 YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
 NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
@@ -20,6 +23,8 @@ Arg = NamedTuple('Arg', [
     ('type', str),
     ('line', int),
 ])
+
+logging.basicConfig(format='%(levelname)-5s: line %(line)s: %(message)s')
 
 _logger = logging.getLogger(__name__)
 
@@ -34,6 +39,55 @@ def _clean_type(s):
 
 def compile(*regexs):
     return [re.compile(s) for s in regexs]
+
+
+class Reader(_Reader):
+    doc_format = None
+
+    def pass_to_format_logger(self, msg):
+        # print(msg.attributes, msg.children)
+
+        if msg['type'] == 'ERROR':
+            log = self.doc_format.error
+        elif msg['type'] == 'WARNING':
+            log = self.doc_format.warning
+        else:
+            return
+        log(Element.astext(msg), line=msg['line'])
+
+    def new_document(self):
+        document = _Reader.new_document(self)
+        document.reporter.stream = False
+        document.reporter.attach_observer(self.pass_to_format_logger)
+        return document
+
+
+def publish_doctree(source, doc_format):
+    """
+    Set up & run a `Publisher` for programmatic use with string I/O.
+    Return the document tree.
+
+    For encoded string input, be sure to set the 'input_encoding' setting to
+    the desired encoding.  Set it to 'unicode' for unencoded Unicode string
+    input.  Here's one way::
+
+        publish_doctree(..., settings_overrides={'input_encoding': 'unicode'})
+
+    Parameters: see `publish_programmatically`.
+    """
+    pub = Publisher(reader=None, parser=None, writer=None,
+                    settings=None,
+                    source_class=io.StringInput,
+                    destination_class=io.NullOutput)
+    pub.reader = Reader(None, 'restructuredtext')
+    pub.reader.doc_format = doc_format
+    pub.set_writer('null')
+    pub.parser = pub.reader.parser
+    pub.process_programmatic_settings(None, None, None)
+    pub.set_source(source, None)
+    pub.set_destination(None, None)
+    output = pub.publish(enable_exit_status=False)
+    return pub.document
 
 
 class DocstringFormat:
@@ -101,24 +155,6 @@ class DocstringFormat:
         """
         raise NotImplementedError
 
-    def do_parse(self, docstring):
-        """
-        Parameters
-        ----------
-        docstring : str
-
-        Returns
-        -------
-        Tuple[Dict[str, Optional[str]], Optional[str]]
-        """
-        params, result = self.parse(docstring)
-        # for k, v in params.items():
-        #     if v is not None:
-        #         params[k] = _clean_type(v)
-        # if result is not None:
-        #     result = _clean_type(result)
-        return params, result
-
 
 class RestBaseFormat(DocstringFormat):
     """
@@ -155,7 +191,7 @@ class RestBaseFormat(DocstringFormat):
         result = None  # type: Arg
 
         try:
-            document = publish_doctree(docstring)
+            document = publish_doctree(docstring, self)
         except SystemMessage:
             return params, result
 
@@ -329,4 +365,4 @@ def parse_docstring(docstring, line=0, logger=None, default_format='auto'):
         format = guess_format(docstring)
     else:
         format = format_map[default_format]
-    return format(line, logger).do_parse(docstring)
+    return format(line, logger).parse(docstring)
