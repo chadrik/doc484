@@ -5,8 +5,7 @@ import sys
 import re
 import os
 import os.path
-import argparse
-import doc484
+from .formats import parse_docstring
 
 
 TYPE_REG = re.compile('\s*#\s*type:.*')
@@ -37,7 +36,7 @@ def convert_string(contents, default_return='Any'):
             s = doc_node.to_python()
             types = []
             line = doc_node.absolute_bounding_box.top_left.line
-            params, result = doc484.parse_docstring(s, line=line)
+            params, result = parse_docstring(s, line=line)
             if obj.arguments:
                 for i, arg in enumerate(obj.arguments):
                     typ = params.get(arg.name.value)
@@ -81,16 +80,3 @@ def convert(path, dry_run=False, default_return='Any'):
                                  default_return=default_return)
     else:
         convert_file(path, dry_run=dry_run, default_return=default_return)
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("path", help="Path to convert")
-    parser.add_argument("--dry-run",
-                        help="Don't convert files, just print results",
-                        action="store_true")
-    parser.add_argument("--default-return",
-                        help="Return value to use when docs are present, but not return "
-                             "value is specified",
-                        default='Any')
-    args = parser.parse_args()
-    convert(args.path, dry_run=args.dry_run, default_return=args.default_return)

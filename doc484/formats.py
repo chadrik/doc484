@@ -5,15 +5,13 @@ from collections import OrderedDict
 
 from typing import List, Tuple, Dict, NamedTuple, Optional, TYPE_CHECKING, Type as Class
 
-from sphinx.ext.napoleon.docstring import GoogleDocstring, NumpyDocstring
-from sphinx.ext.napoleon import Config
-
 import docutils.nodes
 from docutils.core import Publisher
 from docutils import io
 from docutils.utils import SystemMessage
 from docutils.nodes import Element
 from docutils.readers.standalone import Reader as _Reader
+from doc484.parsers import Config, GoogleDocstring, NumpyDocstring
 
 YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
 NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
@@ -262,73 +260,6 @@ default_format = RestFormat
 formats = [NumpyFormat, GoogleFormat, default_format]  # type: List[DocstringFormat]
 format_map = {f.name: f for f in formats}  # type: Dict[str, DocstringFormat]
 
-
-# Transformations
-# ---------------
-
-# FIXME: currently, if these replacements are successful, it will result in an
-# error because the corresponding type is not imported within the module.
-# e.g. error: Name 'Sequence' is not defined
-translations = {
-    'boolean': 'bool',
-    'string': 'str',
-    'integer': 'int',
-    'list': 'List',
-    'dict': 'Dict',
-    'dictionary': 'Dict',
-    # types below need to be imported from typing into the module being parsed:
-    'any': 'Any',
-    'tuple': 'Tuple',
-    'set': 'Set',
-    'sequence': 'Sequence',
-    'iterable': 'Iterable',
-    'mapping': 'Mapping',
-}
-
-# known_generic_types = [
-#     'List', 'Set', 'Dict', 'Iterable', 'Sequence', 'Mapping',
-# ]
-#
-# # Some natural language patterns that we want to support in hooks.
-# known_patterns = [
-#     ('list of ?', 'List[?]'),
-#     ('set of ?', 'List[?]'),
-#     ('sequence of ?', 'Sequence[?]'),
-# ]
-
-union_regex = re.compile(r'(?:\s+or\s+)|(?:\s*\|\s*)')
-
-optional_regex = re.compile(r'(.*)(,\s*optional\s*$)')
-
-
-def standardize_docstring_type(s, is_result=False):
-    processed = []
-    s = _clean_type(s)
-
-    if is_result:
-        optional = False
-    else:
-        # optional
-        optional = optional_regex.search(s)
-        if optional:
-            s = optional.group(1)
-
-    parts = union_regex.split(s)
-    for type_str in parts:
-        for find, replace in translations.items():
-            type_str = re.sub(r'\b' + find + r'\b', replace, type_str)
-        processed.append(type_str)
-    if len(processed) > 1:
-        s = 'Union[' + ', '.join(processed) + ']'
-    else:
-        s = processed[0]
-
-    if optional:
-        s = 'Optional[' + s + ']'
-    return s
-
-
-# ----
 
 def guess_format(docstring):
     """
