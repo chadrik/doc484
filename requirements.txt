@@ -1,4 +1,3 @@
 typing
 docutils
 six
--e git://github.com/chadrik/redbaron.git@1d06c2bb9e536562985996d4eae7416a6d2a9096#egg=redbaron

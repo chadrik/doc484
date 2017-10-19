@@ -16,16 +16,26 @@ from doc484.parsers import Config, GoogleDocstring, NumpyDocstring
 YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
 NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
 
+NAMED_RESULTS_REG = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*\s+\((.*)\) -- ')
 
 Arg = NamedTuple('Arg', [
     ('type', str),
     ('line', int),
 ])
 
-logging.basicConfig(format='%(levelname)-5s: line %(line)s: %(message)s')
+logging.basicConfig()
 
 _logger = logging.getLogger(__name__)
 
+
+def _setup_logger(log):
+    log.propagate = False
+    hdlr = logging.StreamHandler()
+    fmt = logging.Formatter('%(file)s: line %(line)s: %(message)s')
+    hdlr.setFormatter(fmt)
+    log.addHandler(hdlr)
+
+_setup_logger(_logger)
 
 def _cleandoc(docstring):
     return inspect.cleandoc(docstring).replace('`', '')
@@ -36,11 +46,12 @@ def _clean_type(s):
 
 
 def compile(*regexs):
+    # type: (str) -> List[re.Pattern]
     return [re.compile(s) for s in regexs]
 
 
 class Reader(_Reader):
-    doc_format = None
+    doc_format = None  # type: DocstringFormat
 
     def pass_to_format_logger(self, msg):
         # print(msg.attributes, msg.children)
@@ -61,6 +72,7 @@ class Reader(_Reader):
 
 
 def publish_doctree(source, doc_format):
+    # type: (str, DocstringFormat) -> docutils.nodes.Node
     """
     Set up & run a `Publisher` for programmatic use with string I/O.
     Return the document tree.
@@ -92,15 +104,17 @@ class DocstringFormat:
     name = ''
     sections = None  # type: List[str]
 
-    def __init__(self, line, logger=None):
+    def __init__(self, line, filename='<string>', logger=None, options=None):
         """
         Parameters
         ----------
         line : int
-        logger 
+        logger
         """
-        self.logger = logger or _logger
+        self.logger = logger or _logger  # type: logging.Logger
         self.line = line
+        self.filename = filename
+        self.options = options or {}
 
     def warning(self, message, line):
         """
@@ -110,6 +124,7 @@ class DocstringFormat:
         line : int
         """
         extra = {
+            'file': self.filename,
             'line': line + self.line,
             'column': 0
         }
@@ -123,6 +138,7 @@ class DocstringFormat:
         line : int
         """
         extra = {
+            'file': self.filename,
             'line': line + self.line,
             'column': 0
         }
@@ -156,7 +172,8 @@ class DocstringFormat:
 
 class RestBaseFormat(DocstringFormat):
     """
-    Base class for all types that convert to restructuredText as a common parsing format
+    Base class for all types that convert to restructuredText as a common
+    parsing format
     """
     config = Config(napoleon_use_param=True, napoleon_use_rtype=True)
 
@@ -199,12 +216,33 @@ class RestBaseFormat(DocstringFormat):
             # data is e.g.  'type foo'
             parts = data.strip().split()
             if len(parts) == 1 and parts[0] == 'returns':
+                # converted google/numpy format with named results:
+                # :returns: * **result1** (*str*) -- Description of first
+                #           * **result2** (*bool*) -- Description of second
                 items = field.traverse(condition=docutils.nodes.list_item)
                 if items:
-                    # special case to print warning for named return values
-                    self.warning(NAMED_ITEMS_ERROR, field.line)
+                    if self.options.get('allow_named_results', True):
+                        item_types = []
+                        for item in items:
+                            text = item.astext()
+                            m = NAMED_RESULTS_REG.match(text)
+                            if m:
+                                item_types.append(m.group(1))
+                            else:
+                                break
+                        if len(item_types) == 1:
+                            result = Arg(item_types[0], field.line)
+                        elif len(item_types) > 1:
+                            result = Arg('Tuple[%s]' % ', '.join(item_types),
+                                         field.line)
+                    else:
+                        # special case to print warning for named return values
+                        self.warning(NAMED_ITEMS_ERROR, field.line)
             elif len(parts) == 1 or (len(parts) == 2 and parts[0] == 'type'):
-                paragraph = field.traverse(condition=docutils.nodes.paragraph)[0]
+                paras = field.traverse(condition=docutils.nodes.paragraph)
+                if not paras:
+                    continue
+                paragraph = paras[0]
                 arg = Arg(_clean_type(paragraph.astext()), paragraph.line)
                 if len(parts) == 2:
                     # e.g. :type foo: xxxx
@@ -214,7 +252,7 @@ class RestBaseFormat(DocstringFormat):
                     # e.g. :rtype: xxxx
                     result = arg
                 elif len(parts) == 1 and parts[0] == 'Yields':
-                    # e.g. converted from numpy or google format
+                    # e.g. converted from numpy/google format
                     self.warning(YIELDS_ERROR, paragraph.line)
 
         return params, result
@@ -281,7 +319,8 @@ def guess_format(docstring):
     return default_format
 
 
-def parse_docstring(docstring, line=0, logger=None, default_format='auto'):
+def parse_docstring(docstring, line=0, filename='<string>', logger=None,
+                    default_format='auto', options=None):
     """
     Parameters
     ----------
@@ -293,7 +332,9 @@ def parse_docstring(docstring, line=0, logger=None, default_format='auto'):
     Tuple[Dict[str, Arg], Optional[Arg]]
     """
     if default_format == 'auto':
-        format = guess_format(docstring)
+        format_cls = guess_format(docstring)
     else:
-        format = format_map[default_format]
-    return format(line, logger).parse(docstring)
+        format_cls = format_map[default_format]
+    format = format_cls(line, filename=filename, logger=logger,
+                        options=options)
+    return format.parse(docstring)

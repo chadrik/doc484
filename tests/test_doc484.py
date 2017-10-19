@@ -1,4 +1,4 @@
-from doc484 import guess_format, parse_docstring, YIELDS_ERROR, NAMED_ITEMS_ERROR
+from doc484.formats import guess_format, parse_docstring, YIELDS_ERROR, NAMED_ITEMS_ERROR
 
 from typing import List
 
@@ -7,13 +7,13 @@ from mock import MagicMock, call
 import pytest
 
 
-def get_format(docstring):
+def get_format(docstring, options=None):
     format = guess_format(docstring)
-    return format(0, MagicMock())
+    return format(0, logger=MagicMock(), options=options)
 
 
-def parse(docstring):
-    format = get_format(docstring)
+def parse(docstring, options=None):
+    format = get_format(docstring, options=options)
     params, result = format.parse(docstring)
     conformed = [(k, tuple(v)) for k, v in params.items()]
     if result is not None:
@@ -21,9 +21,10 @@ def parse(docstring):
     return conformed
 
 
-def convert(docstring, line=0):
+def convert(docstring, line=0, options=None):
     logger = MagicMock()
-    return logger, parse_docstring(docstring, line, logger)
+    return logger, parse_docstring(docstring, line=line, logger=logger,
+                                   options=options)
 
 
 def test_basic():
@@ -81,6 +82,12 @@ def test_returns():
     ]
 
 
+def test_missing_returns():
+    assert parse('''
+:returns:
+:rtype:''') == []
+
+
 def test_numpydoc():
     s = '''
         One line summary.
@@ -129,9 +136,9 @@ def test_numpydoc_yields():
 :Yields: *str* -- Description of return value.
 '''
     ctx, result = convert(s)
-    # note: warning is misspelled in mypy
     assert ctx.warning.call_args_list == [
-        call(YIELDS_ERROR, extra={'column': 0, 'line': 1})
+        call(YIELDS_ERROR,
+             extra={'column': 0, 'line': 1, 'file': '<string>'})
     ]
 
 
@@ -163,17 +170,23 @@ def test_numpydoc_tuple_result():
             Description of first item
         result2: bool
             Description of second item
+        
+        other stuff that is not return value.
     '''
     format = get_format(s)
     assert format.name == 'numpy'
     assert format.to_rest(s) == '''\
 :returns: * **result1** (*str*) -- Description of first item
           * **result2** (*bool*) -- Description of second item
+          * *other stuff that is not return value.*
 '''
-    ctx, result = convert(s)
-    # note: warning is misspelled in mypy
+    ctx, result = convert(s, options={'allow_named_results': False})
     assert ctx.warning.call_args_list == [
-        call(NAMED_ITEMS_ERROR, extra={'column': 0, 'line': 1})
+        call(NAMED_ITEMS_ERROR,
+             extra={'column': 0, 'line': 1, 'file': '<string>'})
+    ]
+    assert parse(s, options={'allow_named_results': True}) == [
+        ('return', ('Tuple[str, bool]', 1))
     ]
 
 
