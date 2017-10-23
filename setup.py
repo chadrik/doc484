@@ -15,4 +15,7 @@ setup(
     #     "Topic :: Utilities",
     #     "License :: OSI Approved :: BSD License",
     # ],
+    entry_points={
+        'console_scripts': ['doc484=doc484.__main__'],
+    }
 )
