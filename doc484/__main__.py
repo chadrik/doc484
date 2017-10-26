@@ -1,9 +1,9 @@
 import sys
-from lib2to3.main import main
+import lib2to3.main
 
 
-def main():
-    sys.exit(main("doc484.fixes"))
+def main(args=None):
+    sys.exit(lib2to3.main.main("doc484.fixes", args=args))
 
 
 if __name__ == '__main__':
