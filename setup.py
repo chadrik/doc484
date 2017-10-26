@@ -30,5 +30,5 @@ setup(
     entry_points={
         'console_scripts': ['doc484=doc484.__main__:main'],
     },
-    install_requries=requirements
+    install_requires=requirements
 )
