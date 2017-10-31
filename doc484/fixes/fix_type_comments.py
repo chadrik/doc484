@@ -96,6 +96,8 @@ class FixTypeComments(fixer_base.BaseFix):
             return
 
         comment = indent_node.prefix
+        if comment.strip() == '# notype':
+            return
 
         types = []  # type: List[str]
         params, result = parse_docstring(docstring, line=line,
