@@ -21,10 +21,11 @@ from lib2to3 import pytree
 from lib2to3.pgen2 import token
 from lib2to3 import fixer_base
 from lib2to3.fixer_util import syms
+from lib2to3.pygram import python_grammar
 
 from ..formats import parse_docstring
 
-
+number2symbol = python_grammar.number2symbol
 TYPE_REG = re.compile('\s*#\s*type:.*')
 
 
@@ -34,6 +35,16 @@ def _get_type(typ, default='Any'):
 
 def is_type_comment(comment):
     return TYPE_REG.match(comment)
+
+
+def find_classdef(node):
+    while True:
+        parent = node.parent
+        if parent is None:
+            return None
+        elif parent.type == syms.classdef:
+            return parent
+        node = parent
 
 
 def get_docstring(stmt):
@@ -46,13 +57,13 @@ def get_docstring(stmt):
         return None, None
 
 
-def should_skip_arg(i, arg_name, typ):
+def keep_arg(i, arg_name, typ):
     # we can't *easily* tell from here if the current func is a
     # method, but the below is a pretty good assurance that we can skip
     # the current arg.
     # there is nothing wrong with including self or cls, but pep484
     # supports omitting it for brevity.
-    return i == 0 and arg_name in {'self', 'cls'} and typ is None
+    return not (i == 0 and arg_name in {'self', 'cls'} and typ is None)
 
 
 class FixTypeComments(fixer_base.BaseFix):
@@ -60,16 +71,19 @@ class FixTypeComments(fixer_base.BaseFix):
                   #patterns
     BM_compatible = True
 
-    PATTERN = """
-              funcdef< 'def' name=any parameters< '(' [args=any] ')' >
-                       ['->' any] ':' suite=any+ >
-              """
+    PATTERN = """ 
+    funcdef< 'def' name=any parameters< '(' [args=any] ')' >
+           ['->' any] ':' suite=any+ >
+    """
 
     def transform(self, node, results):
         suite = results["suite"]
         args = results.get("args")
         name = results["name"]
-        # print `name`
+        classdef = find_classdef(name)
+        is_method = classdef is not None
+        # print name, is_method
+
         if suite[0].children[1].type == token.INDENT:
             indent_node = suite[0].children[1]
             doc_node = suite[0].children[2]
@@ -105,7 +119,7 @@ class FixTypeComments(fixer_base.BaseFix):
 
             for i, arg in enumerate(arg_list):
                 typ = params.get(arg.value)
-                if not should_skip_arg(i, arg.value, typ):
+                if not is_method or keep_arg(i, arg.value, typ):
                     types.append(_get_type(typ))
 
         if result is None and all([x == 'Any' for x in types]):
