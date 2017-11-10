@@ -1,32 +1,78 @@
 
-## Utilities for using PEP484 type annotations within docstrings
+## Generate PEP 484 type annotations from docstrings
 
-This is still a very rough draft.
+`doc484` provides a script to convert PEP484 docstrings to type comments, and can also be used as a normal python module.  It supports the three major docstring conventions:
+- [numpy](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html#example-numpy)
+- [google](http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html)
+- [restructuredText](https://thomas-cokelaer.info/tutorials/sphinx/docstring_python.html#template-py-source-file)
 
-It is currently comprised of two tools:
-- a script to convert PEP484 docstrings to type comments
-- a [mypy](http://mypy.readthedocs.io/en/latest/) plugin that enables it to read type annotations from docstrings.  
+Regardless of docstring convention you choose, the types declared within your docstrings should following the guidelines in [PEP 484](https://www.python.org/dev/peps/pep-0484/), especially use of the [`typing`](https://docs.python.org/3/library/typing.html) module, where necessary.
 
-Supports numpy, google, and restructuredText (aka sphinx) styled docstrings.
+### Example
 
+#### Before
 
-### mypy plugin
+```python
+from typing import Optional
 
-To use the plugin:
+def maxlines(input, numlines=None):
+    """
+    Parameters
+    ----------
+    input : str
+    numlines : Optional[int]
+
+    Returns
+    -------
+    str
+    """
+    if numlines is None:
+        return input
+    return '\n'.join(input.split('\n')[:numlines])
+```
+
+#### After
+
+```python
+from typing import Optional
+
+def maxlines(input, numlines=None):
+    # type: (str, Optional[int]) -> str
+    """
+    Parameters
+    ----------
+    input : str
+    numlines : Optional[int]
+
+    Returns
+    -------
+    str
+    """
+    if numlines is None:
+        return input
+    return '\n'.join(input.split('\n')[:numlines])
+```
+
+The file is now properly inspectable by mypy or PyCharm.
+
+### Installing
 
 ```
-git clone https://github.com/chadrik/mypy
-cd mypy
-git checkout docstrings
-python3 -m pip install -r requirements.txt
-python3 -m mypy /path/to/file
+pip install doc484
 ```
 
-### docs-to-comments converter
-
-To use the converter:
+### Processing files
 
 ```
-pip install -r requirements.txt
-python ./docs-to-comments.py -h
+doc484 -h
 ```
+
+### TODO
+
+- automatically insert `typing` imports
+- convert docstrings to function annotations (for python 3.5+)
+- add argument for docstring format (or read from setup.cfg)
+
+### Also
+
+This repo also contains a [`mypy`](http://mypy.readthedocs.io/en/latest/) plugin that allows type annotations to be read directly from docstrings, but I've given up on that project, due to lack of interest from the `mypy` developers. Here's the [PR](https://github.com/python/mypy/pull/3225), in case it is of any interest.
