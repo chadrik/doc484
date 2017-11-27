@@ -16,6 +16,8 @@ It will also support lambdas:
     # The parens are a syntax error in Python 3
     lambda (x): x + y -> lambda x: x + y
 """
+from __future__ import absolute_import, print_function
+
 import re
 from lib2to3 import pytree
 from lib2to3.pgen2 import token
@@ -43,18 +45,32 @@ def find_classdef(node):
         if parent is None:
             return None
         elif parent.type == syms.classdef:
-            return parent
+            # return the suite as list
+            for child in parent.children:
+                if child.type == syms.suite:
+                    return [child]
+            else:
+                raise RuntimeError("could not find suite")
         node = parent
 
 
-def get_docstring(stmt):
-    if isinstance(stmt, pytree.Node) and \
-           stmt.children[0].type == token.STRING:
-        doc = stmt.children[0].value
-        # FIXME: something better than eval
-        return eval(doc), stmt.children[0].lineno
+def get_docstring(suite):
+    assert isinstance(suite, list)
+    if suite[0].children[1].type == token.INDENT:
+        indent_node = suite[0].children[1]
+        doc_node = suite[0].children[2]
     else:
-        return None, None
+        # e.g. "def foo(...): x = 5; y = 7"
+        return None, None, None
+
+    if isinstance(doc_node, pytree.Node) and \
+            doc_node.children[0].type == token.STRING:
+        doc = doc_node.children[0].value
+        # convert '"docstring"' to 'docstring'
+        # FIXME: something better than eval
+        return eval(doc), doc_node.children[0].lineno, indent_node
+    else:
+        return None, None, indent_node
 
 
 def keep_arg(i, arg_name, typ):
@@ -79,19 +95,16 @@ class FixTypeComments(fixer_base.BaseFix):
     def transform(self, node, results):
         suite = results["suite"]
         args = results.get("args")
-        name = results["name"]
-        classdef = find_classdef(name)
-        is_method = classdef is not None
+        name_node = results["name"]
+        # strip because name_node includes the whitespace prefix.  e.g. ' foo'
+        name = str(name_node).strip()
+        class_suite = find_classdef(name_node)
+        is_method = class_suite is not None
         # print name, is_method
 
-        if suite[0].children[1].type == token.INDENT:
-            indent_node = suite[0].children[1]
-            doc_node = suite[0].children[2]
-        else:
-            # e.g. "def foo(...): x = 5; y = 7"
-            return
-
-        docstring, line = get_docstring(doc_node)
+        docstring, line, indent_node = get_docstring(suite)
+        if docstring is None and name == '__init__' and class_suite is not None:
+            docstring, line, _ = get_docstring(class_suite)
         if docstring is None:
             return
 
@@ -107,24 +120,33 @@ class FixTypeComments(fixer_base.BaseFix):
             #     pass
             if args.type == syms.typedargslist:
                 arg_list = []
+                kind_list = []
                 consume = True
+                kind = ''
                 for arg in args.children:
                     if consume and arg.type == token.NAME:
                         arg_list.append(arg)
+                        kind_list.append(kind)
                         consume = False
+                    elif consume and arg.type == token.STAR:
+                        kind = '*'
+                    elif consume and arg.type == token.DOUBLESTAR:
+                        kind = '**'
                     elif arg.type == token.COMMA:
                         consume = True
+                        kind = ''
             elif args.type == token.NAME:
                 arg_list = [args]
+                kind_list = ['']
             else:
                 raise TypeError(args)
 
-            for i, arg in enumerate(arg_list):
+            for i, (arg, kind) in enumerate(zip(arg_list, kind_list)):
                 typ = params.get(arg.value)
                 if not is_method or keep_arg(i, arg.value, typ):
-                    types.append(_get_type(typ))
+                    types.append(kind + _get_type(typ).strip('*'))
 
-        if result is None and all([x == 'Any' for x in types]):
+        if result is None and all([x.strip('*') == 'Any' for x in types]):
             # no effect: don't bother with type comment
             return
 

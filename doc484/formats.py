@@ -1,3 +1,4 @@
+from __future__ import absolute_import, print_function
 import re
 import inspect
 import logging
@@ -16,7 +17,7 @@ from doc484.parsers import Config, GoogleDocstring, NumpyDocstring
 YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
 NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
 
-NAMED_RESULTS_REG = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*\s+\((.*)\) -- ')
+NAMED_RESULTS_REG = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*\s+\(([^)]+)\)')
 
 Arg = NamedTuple('Arg', [
     ('type', str),
@@ -35,7 +36,6 @@ def _setup_logger(log):
     hdlr.setFormatter(fmt)
     log.addHandler(hdlr)
 
-_setup_logger(_logger)
 
 def _cleandoc(docstring):
     return inspect.cleandoc(docstring).replace('`', '')
@@ -217,8 +217,10 @@ class RestBaseFormat(DocstringFormat):
             parts = data.strip().split()
             if len(parts) == 1 and parts[0] == 'returns':
                 # converted google/numpy format with named results:
-                # :returns: * **result1** (*str*) -- Description of first
-                #           * **result2** (*bool*) -- Description of second
+                # * **result1** (*str*) -- Description of first item
+                # * **result2** (*bool*)
+                # * **result3** (*int*) -- Description of third item
+                # * *other stuff that is not return value.*
                 items = field.traverse(condition=docutils.nodes.list_item)
                 if items:
                     if self.options.get('allow_named_results', True):
@@ -338,3 +340,6 @@ def parse_docstring(docstring, line=0, filename='<string>', logger=None,
     format = format_cls(line, filename=filename, logger=logger,
                         options=options)
     return format.parse(docstring)
+
+
+_setup_logger(_logger)

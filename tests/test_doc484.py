@@ -167,17 +167,21 @@ def test_numpydoc_tuple_result():
         Returns
         -------
         result1: str
-            Description of first item
+            Description with (items, in) parentheses
         result2: bool
-            Description of second item
-        
+        result3 : Dict[str, int]
+            Description of third item
+            That trails to next line
         other stuff that is not return value.
     '''
     format = get_format(s)
     assert format.name == 'numpy'
+    print(format.to_rest(s))
     assert format.to_rest(s) == '''\
-:returns: * **result1** (*str*) -- Description of first item
-          * **result2** (*bool*) -- Description of second item
+:returns: * **result1** (*str*) -- Description with (items, in) parentheses
+          * **result2** (*bool*)
+          * **result3** (*Dict[str, int]*) -- Description of third item
+            That trails to next line
           * *other stuff that is not return value.*
 '''
     ctx, result = convert(s, options={'allow_named_results': False})
@@ -186,7 +190,7 @@ def test_numpydoc_tuple_result():
              extra={'column': 0, 'line': 1, 'file': '<string>'})
     ]
     assert parse(s, options={'allow_named_results': True}) == [
-        ('return', ('Tuple[str, bool]', 1))
+        ('return', ('Tuple[str, bool, Dict[str, int]]', 1))
     ]
 
 

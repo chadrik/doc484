@@ -6,7 +6,6 @@ from lib2to3.refactor import RefactoringTool, get_fixers_from_package
 def convert_string(input):
     tool = RefactoringTool(get_fixers_from_package("doc484.fixes"))
     tree = tool.refactor_string(input, '<test.py>')
-    # The [:-1] is to take off the \n we added earlier
     return str(tree)
 
 
@@ -53,6 +52,80 @@ def foo(one, two, three):
     assert output == expected
 
 
+def test_star_args():
+    # Not necessary for mypy but useful for PyCharm
+
+    input = '''\
+def foo(one, *two, **three):
+    """
+    Parameters
+    ----------
+    one : Union[str, int]
+    two : str
+
+    Return
+    ------
+    bool
+    """
+    pass
+'''
+    output = convert_string(input)
+
+    expected = '''\
+def foo(one, *two, **three):
+    # type: (Union[str, int], *str, **Any) -> bool
+    """
+    Parameters
+    ----------
+    one : Union[str, int]
+    two : str
+
+    Return
+    ------
+    bool
+    """
+    pass
+'''
+    assert output == expected
+
+
+def test_star_args2():
+    # Not necessary for mypy but useful for PyCharm
+
+    input = '''\
+def foo(one, *two, **three):
+    """
+    Parameters
+    ----------
+    one : Union[str, int]
+    two : *str
+
+    Return
+    ------
+    bool
+    """
+    pass
+'''
+    output = convert_string(input)
+
+    expected = '''\
+def foo(one, *two, **three):
+    # type: (Union[str, int], *str, **Any) -> bool
+    """
+    Parameters
+    ----------
+    one : Union[str, int]
+    two : *str
+
+    Return
+    ------
+    bool
+    """
+    pass
+'''
+    assert output == expected
+
+
 def test_notype():
     input = '''\
 def foo(one, two, three):
@@ -76,7 +149,7 @@ def foo(one, two, three):
 
 def test_no_doc_types():
     input = '''\
-def foo(one, two, three):
+def foo(one, *two, **three):
     """
     Description of foo
     """
@@ -155,5 +228,63 @@ def foo(self, one, two, three):
     bool
     """
     pass
+'''
+    assert output == expected
+
+
+def test_class_init_docs():
+    input = '''\
+class Foo:
+    """
+    Parameters
+    ----------
+    one : Union[str, int]
+    two : str
+    """
+    def __init__(self, one, two, three):
+        pass
+'''
+    output = convert_string(input)
+
+    expected = '''\
+class Foo:
+    """
+    Parameters
+    ----------
+    one : Union[str, int]
+    two : str
+    """
+    def __init__(self, one, two, three):
+        # type: (Union[str, int], str, Any) -> None
+        pass
+'''
+    assert output == expected
+
+
+def test_no_change():
+    input = '''\
+class Foo:
+    """
+    Parameters
+    ----------
+    one : Union[str, int]
+    two : str
+    """
+    def __init__(self, one, two, three):
+        pass
+'''
+    output = convert_string(input)
+
+    expected = '''\
+class Foo:
+    """
+    Parameters
+    ----------
+    one : Union[str, int]
+    two : str
+    """
+    def __init__(self, one, two, three):
+        # type: (Union[str, int], str, Any) -> None
+        pass
 '''
     assert output == expected
