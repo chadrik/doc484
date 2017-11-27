@@ -14,19 +14,13 @@ requirements = [x.strip() for x in read('requirements.txt').split('\n')
 
 setup(
     name="doc484",
-    version="0.0.2",
+    version="0.1.0",
     author="Chad Dombrova",
-    description="Utilities for working with PEP484 types within docstrings",
-    license="BSD",
-    keywords="example documentation tutorial",
-    url="http://packages.python.org/an_example_pypi_project",
+    description="Generate PEP 484 type comments from docstrings",
+    license="MIT",
+    keywords=["mypy", "typing", "pep484", "docstrings"],
+    url="https://github.com/chadrik/doc484",
     packages=find_packages(),
-    # long_description=read('README'),
-    # classifiers=[
-    #     "Development Status :: 3 - Alpha",
-    #     "Topic :: Utilities",
-    #     "License :: OSI Approved :: BSD License",
-    # ],
     entry_points={
         'console_scripts': ['doc484=doc484.__main__:main'],
     },
