@@ -12,7 +12,9 @@ docs/build/
 .mypy_cache/
 .incremental_checker_cache.json
 .cache
+.tox
 .runtest_log.json
+dist
 
 # Packages
 *.egg

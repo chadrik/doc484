@@ -951,6 +951,10 @@ class GoogleDocstring(UnicodeMixin):
                     lines = self._consume_to_next_section()
             self._parsed_lines.extend(lines)
 
+    def _skip_section(self, section):
+        self._consume_to_next_section()
+        return []
+
     def _parse_attribute_docstring(self):
         _type, _desc = self._consume_inline_attribute()
         return self._format_field('', _type, _desc)

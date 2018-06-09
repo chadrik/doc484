@@ -1,3 +1,0 @@
-typing
-docutils
-six

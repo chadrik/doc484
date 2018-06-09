@@ -3,14 +3,9 @@ import os.path
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
-
 def read(*parts):
     with open(os.path.join(HERE, *parts)) as f:
         return f.read()
-
-
-requirements = [x.strip() for x in read('requirements.txt').split('\n')
-                if x.strip()]
 
 setup(
     name="doc484",
@@ -24,5 +19,17 @@ setup(
     entry_points={
         'console_scripts': ['doc484=doc484.__main__:main'],
     },
-    install_requires=requirements
+    install_requires=[
+        "typing",
+        "docutils",
+        "six",
+    ],
+    extras_require={
+        "tests": [
+            "coverage",
+            "mock==2.0.0",
+            "pytest==3.0.7",
+            "tox==2.7.0",
+        ],
+    },
 )
