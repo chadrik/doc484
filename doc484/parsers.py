@@ -607,7 +607,6 @@ class GoogleDocstring(UnicodeMixin):
             'yield': self._parse_yields_section,
             'yields': self._parse_yields_section,
         }
-        self._parse()
 
     def __unicode__(self):
         """Return the parsed docstring in reStructuredText format.
@@ -674,7 +673,9 @@ class GoogleDocstring(UnicodeMixin):
             _type, _name = _name, _type
         indent = self._get_indent(line) + 1
         _desc = [_desc] + self._dedent(self._consume_indented_block(indent))
-        _desc = self.__class__(_desc, self._config).lines()
+        parser = self.__class__(_desc, self._config)
+        parser.parse()
+        _desc = parser.lines()
         return _name, _type, _desc
 
     def _consume_fields(self, parse_type=True, prefer_type=False):
@@ -705,7 +706,9 @@ class GoogleDocstring(UnicodeMixin):
                 else:
                     _type = before
 
-            _desc = self.__class__(_desc, self._config).lines()
+            parser = self.__class__(_desc, self._config)
+            parser.parse()
+            _desc = parser.lines()
             return [(_name, _type, _desc,)]
         else:
             return []
@@ -892,7 +895,7 @@ class GoogleDocstring(UnicodeMixin):
                     line and
                     not self._is_indented(line, self._section_indent)))
 
-    def _parse(self):
+    def parse(self):
         self._parsed_lines = self._consume_empty()
 
         while self._line_iter.has_next():
@@ -1123,7 +1126,9 @@ class NumpyDocstring(GoogleDocstring):
             _type, _name = _name, _type
         indent = self._get_indent(line) + 1
         _desc = self._dedent(self._consume_indented_block(indent))
-        _desc = self.__class__(_desc, self._config).lines()
+        parser = self.__class__(_desc, self._config)
+        parser.parse()
+        _desc = parser.lines()
         return _name, _type, _desc
 
     def _consume_returns_section(self):

@@ -281,7 +281,9 @@ class NumpyFormat(RestBaseFormat):
     )
 
     def to_rest(self, docstring):
-        return str(NumpyDocstring(_cleandoc(docstring), self.config))
+        parser = NumpyDocstring(_cleandoc(docstring), self.config)
+        parser.parse()
+        return str(parser)
 
 
 class GoogleFormat(RestBaseFormat):
@@ -293,7 +295,9 @@ class GoogleFormat(RestBaseFormat):
     )
 
     def to_rest(self, docstring):
-        return str(GoogleDocstring(_cleandoc(docstring), self.config))
+        parser = GoogleDocstring(_cleandoc(docstring), self.config)
+        parser.parse()
+        return str(parser)
 
 
 default_format = RestFormat
