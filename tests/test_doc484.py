@@ -113,12 +113,12 @@ One line summary.
 
 Extended description.
 
-:param arg1: Description of arg1
+:param arg1:
 :type arg1: Any
-:param arg2: Description of arg2
+:param arg2:
 :type arg2: Union[str, int]
 
-:returns: Description of return value.
+:returns:
 :rtype: str
 '''
 
@@ -133,7 +133,7 @@ def test_numpydoc_yields():
     format = get_format(s)
     assert format.name == 'numpy'
     assert format.to_rest(s) == '''\
-:Yields: *str* -- Description of return value.
+:Yields: *str*
 '''
     ctx, result = convert(s)
     assert ctx.warning.call_args_list == [
@@ -152,7 +152,7 @@ def test_numpydoc_named_result():
     format = get_format(s)
     assert format.name == 'numpy'
     assert format.to_rest(s) == '''\
-:returns: **result1** -- Description of first item
+:returns: **result1**
 :rtype: str
 '''
     ctx, result = convert(s)
@@ -178,10 +178,9 @@ def test_numpydoc_tuple_result():
     assert format.name == 'numpy'
     print(format.to_rest(s))
     assert format.to_rest(s) == '''\
-:returns: * **result1** (*str*) -- Description with (items, in) parentheses
+:returns: * **result1** (*str*)
           * **result2** (*bool*)
-          * **result3** (*Dict[str, int]*) -- Description of third item
-            That trails to next line
+          * **result3** (*Dict[str, int]*)
           * *other stuff that is not return value.*
 '''
     ctx, result = convert(s, options={'allow_named_results': False})

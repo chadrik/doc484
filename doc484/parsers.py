@@ -672,19 +672,16 @@ class GoogleDocstring(UnicodeMixin):
         if prefer_type and not _type:
             _type, _name = _name, _type
         indent = self._get_indent(line) + 1
-        _desc = [_desc] + self._dedent(self._consume_indented_block(indent))
-        parser = self.__class__(_desc, self._config)
-        parser.parse()
-        _desc = parser.lines()
-        return _name, _type, _desc
+        self._consume_indented_block(indent)
+        return _name, _type
 
     def _consume_fields(self, parse_type=True, prefer_type=False):
         self._consume_empty()
         fields = []
         while not self._is_section_break():
-            _name, _type, _desc = self._consume_field(parse_type, prefer_type)
-            if _name or _type or _desc:
-                fields.append((_name, _type, _desc,))
+            _name, _type = self._consume_field(parse_type, prefer_type)
+            if _name or _type:
+                fields.append((_name, _type,))
         return fields
 
     def _consume_returns_section(self):
@@ -694,11 +691,6 @@ class GoogleDocstring(UnicodeMixin):
             _name, _type, _desc = '', '', lines
 
             if colon:
-                if after:
-                    _desc = [after] + lines[1:]
-                else:
-                    _desc = lines[1:]
-
                 match = _google_typed_arg_regex.match(before)
                 if match:
                     _name = match.group(1)
@@ -706,10 +698,7 @@ class GoogleDocstring(UnicodeMixin):
                 else:
                     _type = before
 
-            parser = self.__class__(_desc, self._config)
-            parser.parse()
-            _desc = parser.lines()
-            return [(_name, _type, _desc,)]
+            return [(_name, _type,)]
         else:
             return []
 
@@ -774,10 +763,8 @@ class GoogleDocstring(UnicodeMixin):
         else:
             return [prefix]
 
-    def _format_field(self, _name, _type, _desc):
-        _desc = self._strip_empty(_desc)
-        has_desc = any(_desc)
-        separator = has_desc and ' -- ' or ''
+    def _format_field(self, _name, _type):
+        separator = ''
         if _name:
             if _type:
                 if '`' in _type:
@@ -794,20 +781,15 @@ class GoogleDocstring(UnicodeMixin):
         else:
             field = ''
 
-        if has_desc:
-            if self._is_list(_desc):
-                return [field, ''] + _desc
-            return [field + _desc[0]] + _desc[1:]
-        else:
-            return [field]
+        return [field]
 
     def _format_fields(self, field_type, fields):
         field_type = ':%s:' % field_type.strip()
         padding = ' ' * len(field_type)
         multi = len(fields) > 1
         lines = []
-        for _name, _type, _desc in fields:
-            field = self._format_field(_name, _type, _desc)
+        for _name, _type in fields:
+            field = self._format_field(_name, _type)
             if multi:
                 if lines:
                     lines.extend(self._format_block(padding + ' * ', field))
@@ -926,15 +908,8 @@ class GoogleDocstring(UnicodeMixin):
         fields = self._consume_fields()
         if self._config.napoleon_use_param:
             lines = []
-            for _name, _type, _desc in fields:
-                _desc = self._strip_empty(_desc)
-                if any(_desc):
-                    if self._is_list(_desc):
-                        _desc = [''] + _desc
-                    field = ':param %s: ' % _name
-                    lines.extend(self._format_block(field, _desc))
-                else:
-                    lines.append(':param %s:' % _name)
+            for _name, _type in fields:
+                lines.append(':param %s:' % _name)
 
                 if _type:
                     lines.append(':type %s: %s' % (_name, _type))
@@ -952,11 +927,11 @@ class GoogleDocstring(UnicodeMixin):
             use_rtype = self._config.napoleon_use_rtype
 
         lines = []
-        for _name, _type, _desc in fields:
+        for _name, _type in fields:
             if use_rtype:
-                field = self._format_field(_name, '', _desc)
+                field = self._format_field(_name, '')
             else:
-                field = self._format_field(_name, _type, _desc)
+                field = self._format_field(_name, _type)
 
             if multi:
                 if lines:
@@ -1125,11 +1100,8 @@ class NumpyDocstring(GoogleDocstring):
         if prefer_type and not _type:
             _type, _name = _name, _type
         indent = self._get_indent(line) + 1
-        _desc = self._dedent(self._consume_indented_block(indent))
-        parser = self.__class__(_desc, self._config)
-        parser.parse()
-        _desc = parser.lines()
-        return _name, _type, _desc
+        self._consume_indented_block(indent)
+        return _name, _type
 
     def _consume_returns_section(self):
         return self._consume_fields(prefer_type=True)
