@@ -31,7 +31,6 @@ from __future__ import absolute_import, print_function
 
 
 import collections
-import inspect
 import re
 
 from six import string_types, u
@@ -68,7 +67,6 @@ _enumerated_list_regex = re.compile(
     r'^(?P<paren>\()?'
     r'(\d+|#|[ivxlcdm]+|[IVXLCDM]+|[a-zA-Z])'
     r'(?(paren)\)|\.)(\s+\S|\s*$)')
-
 
 
 class Config(object):
@@ -568,29 +566,14 @@ class GoogleDocstring(UnicodeMixin):
     <BLANKLINE>
 
     """
-    def __init__(self, docstring, config=None, app=None, what='', name='',
-                 obj=None, options=None):
+    _directive_sections = []
+
+    def __init__(self, docstring, config=None):
         self._config = config
-        self._app = app
 
         if not self._config:
-            from sphinx.ext.napoleon import Config
-            self._config = self._app and self._app.config or Config()
+            self._config = Config()
 
-        if not what:
-            if inspect.isclass(obj):
-                what = 'class'
-            elif inspect.ismodule(obj):
-                what = 'module'
-            elif isinstance(obj, collections.Callable):
-                what = 'function'
-            else:
-                what = 'object'
-
-        self._what = what
-        self._name = name
-        self._obj = obj
-        self._opt = options
         if isinstance(docstring, string_types):
             docstring = docstring.splitlines()
         self._lines = docstring
@@ -598,34 +581,32 @@ class GoogleDocstring(UnicodeMixin):
         self._parsed_lines = []
         self._is_in_section = False
         self._section_indent = 0
-        if not hasattr(self, '_directive_sections'):
-            self._directive_sections = []
-        if not hasattr(self, '_sections'):
-            self._sections = {
-                'args': self._parse_parameters_section,
-                'arguments': self._parse_parameters_section,
-                'attributes': self._parse_attributes_section,
-                'example': self._parse_examples_section,
-                'examples': self._parse_examples_section,
-                'keyword args': self._parse_keyword_arguments_section,
-                'keyword arguments': self._parse_keyword_arguments_section,
-                'methods': self._parse_methods_section,
-                'note': self._parse_note_section,
-                'notes': self._parse_notes_section,
-                'other parameters': self._parse_other_parameters_section,
-                'parameters': self._parse_parameters_section,
-                'return': self._parse_returns_section,
-                'returns': self._parse_returns_section,
-                'raises': self._parse_raises_section,
-                'references': self._parse_references_section,
-                'see also': self._parse_see_also_section,
-                'todo': self._parse_todo_section,
-                'warning': self._parse_warning_section,
-                'warnings': self._parse_warning_section,
-                'warns': self._parse_warns_section,
-                'yield': self._parse_yields_section,
-                'yields': self._parse_yields_section,
-            }
+
+        self._sections = {
+            'args': self._parse_parameters_section,
+            'arguments': self._parse_parameters_section,
+            'attributes': self._skip_section,
+            'example': self._skip_section,
+            'examples': self._skip_section,
+            'keyword args': self._skip_section,
+            'keyword arguments': self._skip_section,
+            'methods': self._skip_section,
+            'note': self._skip_section,
+            'notes': self._skip_section,
+            'other parameters': self._skip_section,
+            'parameters': self._parse_parameters_section,
+            'return': self._parse_returns_section,
+            'returns': self._parse_returns_section,
+            'raises': self._skip_section,
+            'references': self._skip_section,
+            'see also': self._skip_section,
+            'todo': self._skip_section,
+            'warning': self._skip_section,
+            'warnings': self._skip_section,
+            'warns': self._skip_section,
+            'yield': self._parse_yields_section,
+            'yields': self._parse_yields_section,
+        }
         self._parse()
 
     def __unicode__(self):
@@ -705,15 +686,6 @@ class GoogleDocstring(UnicodeMixin):
                 fields.append((_name, _type, _desc,))
         return fields
 
-    def _consume_inline_attribute(self):
-        line = next(self._line_iter)
-        _type, colon, _desc = self._partition_field_on_colon(line)
-        if not colon:
-            _type, _desc = _desc, _type
-        _desc = [_desc] + self._dedent(self._consume_to_end())
-        _desc = self.__class__(_desc, self._config).lines()
-        return _type, _desc
-
     def _consume_returns_section(self):
         lines = self._dedent(self._consume_to_next_section())
         if lines:
@@ -737,10 +709,6 @@ class GoogleDocstring(UnicodeMixin):
             return [(_name, _type, _desc,)]
         else:
             return []
-
-    def _consume_usage_section(self):
-        lines = self._dedent(self._consume_to_next_section())
-        return lines
 
     def _consume_section_header(self):
         section = next(self._line_iter)
@@ -927,10 +895,6 @@ class GoogleDocstring(UnicodeMixin):
     def _parse(self):
         self._parsed_lines = self._consume_empty()
 
-        if self._name and (self._what == 'attribute' or self._what == 'data'):
-            self._parsed_lines.extend(self._parse_attribute_docstring())
-            return
-
         while self._line_iter.has_next():
             if self._is_section_header():
                 try:
@@ -955,74 +919,6 @@ class GoogleDocstring(UnicodeMixin):
         self._consume_to_next_section()
         return []
 
-    def _parse_attribute_docstring(self):
-        _type, _desc = self._consume_inline_attribute()
-        return self._format_field('', _type, _desc)
-
-    def _parse_attributes_section(self, section):
-        lines = []
-        for _name, _type, _desc in self._consume_fields():
-            if self._config.napoleon_use_ivar:
-                field = ':ivar %s: ' % _name
-                lines.extend(self._format_block(field, _desc))
-                if _type:
-                    lines.append(':vartype %s: %s' % (_name, _type))
-            else:
-                lines.extend(['.. attribute:: ' + _name, ''])
-                field = self._format_field('', _type, _desc)
-                lines.extend(self._indent(field, 3))
-                lines.append('')
-        if self._config.napoleon_use_ivar:
-            lines.append('')
-        return lines
-
-    def _parse_examples_section(self, section):
-        use_admonition = self._config.napoleon_use_admonition_for_examples
-        return self._parse_generic_section(section, use_admonition)
-
-    def _parse_usage_section(self, section):
-        header = ['.. rubric:: Usage:', '']
-        block = ['.. code-block:: python', '']
-        lines = self._consume_usage_section()
-        lines = self._indent(lines, 3)
-        return header + block + lines + ['']
-
-    def _parse_generic_section(self, section, use_admonition):
-        lines = self._strip_empty(self._consume_to_next_section())
-        lines = self._dedent(lines)
-        if use_admonition:
-            header = '.. admonition:: %s' % section
-            lines = self._indent(lines, 3)
-        else:
-            header = '.. rubric:: %s' % section
-        if lines:
-            return [header, ''] + lines + ['']
-        else:
-            return [header, '']
-
-    def _parse_keyword_arguments_section(self, section):
-        return self._format_fields('Keyword Arguments', self._consume_fields())
-
-    def _parse_methods_section(self, section):
-        lines = []
-        for _name, _, _desc in self._consume_fields(parse_type=False):
-            lines.append('.. method:: %s' % _name)
-            if _desc:
-                lines.extend([''] + self._indent(_desc, 3))
-            lines.append('')
-        return lines
-
-    def _parse_note_section(self, section):
-        lines = self._consume_to_next_section()
-        return self._format_admonition('note', lines)
-
-    def _parse_notes_section(self, section):
-        use_admonition = self._config.napoleon_use_admonition_for_notes
-        return self._parse_generic_section('Notes', use_admonition)
-
-    def _parse_other_parameters_section(self, section):
-        return self._format_fields('Other Parameters', self._consume_fields())
-
     def _parse_parameters_section(self, section):
         fields = self._consume_fields()
         if self._config.napoleon_use_param:
@@ -1043,48 +939,6 @@ class GoogleDocstring(UnicodeMixin):
             return lines + ['']
         else:
             return self._format_fields('Parameters', fields)
-
-    def _parse_raises_section(self, section):
-        fields = self._consume_fields(parse_type=False, prefer_type=True)
-        field_type = ':raises:'
-        padding = ' ' * len(field_type)
-        multi = len(fields) > 1
-        lines = []
-        for _, _type, _desc in fields:
-            _desc = self._strip_empty(_desc)
-            has_desc = any(_desc)
-            separator = has_desc and ' -- ' or ''
-            if _type:
-                has_refs = '`' in _type or ':' in _type
-                has_space = any(c in ' \t\n\v\f ' for c in _type)
-
-                if not has_refs and not has_space:
-                    _type = ':exc:`%s`%s' % (_type, separator)
-                elif has_desc and has_space:
-                    _type = '*%s*%s' % (_type, separator)
-                else:
-                    _type = '%s%s' % (_type, separator)
-
-                if has_desc:
-                    field = [_type + _desc[0]] + _desc[1:]
-                else:
-                    field = [_type]
-            else:
-                field = _desc
-            if multi:
-                if lines:
-                    lines.extend(self._format_block(padding + ' * ', field))
-                else:
-                    lines.extend(self._format_block(field_type + ' * ', field))
-            else:
-                lines.extend(self._format_block(field_type + ' ', field))
-        if lines and lines[-1]:
-            lines.append('')
-        return lines
-
-    def _parse_references_section(self, section):
-        use_admonition = self._config.napoleon_use_admonition_for_references
-        return self._parse_generic_section('References', use_admonition)
 
     def _parse_returns_section(self, section):
         fields = self._consume_returns_section()
@@ -1113,21 +967,6 @@ class GoogleDocstring(UnicodeMixin):
         if lines and lines[-1]:
             lines.append('')
         return lines
-
-    def _parse_see_also_section(self, section):
-        lines = self._consume_to_next_section()
-        return self._format_admonition('seealso', lines)
-
-    def _parse_todo_section(self, section):
-        lines = self._consume_to_next_section()
-        return self._format_admonition('todo', lines)
-
-    def _parse_warning_section(self, section):
-        lines = self._consume_to_next_section()
-        return self._format_admonition('warning', lines)
-
-    def _parse_warns_section(self, section):
-        return self._format_fields('Warns', self._consume_fields())
 
     def _parse_yields_section(self, section):
         fields = self._consume_returns_section()
@@ -1269,11 +1108,7 @@ class NumpyDocstring(GoogleDocstring):
             The lines of the docstring in a list.
 
     """
-    def __init__(self, docstring, config=None, app=None, what='', name='',
-                 obj=None, options=None):
-        self._directive_sections = ['.. index::']
-        super(NumpyDocstring, self).__init__(docstring, config, app, what,
-                                             name, obj, options)
+    _directive_sections = ['.. index::']
 
     def _consume_field(self, parse_type=True, prefer_type=False):
         line = next(self._line_iter)
@@ -1324,117 +1159,3 @@ class NumpyDocstring(GoogleDocstring):
 
     _name_rgx = re.compile(r"^\s*(:(?P<role>\w+):`(?P<name>[a-zA-Z0-9_.-]+)`|"
                            r" (?P<name2>[a-zA-Z0-9_.-]+))\s*", re.X)
-
-    def _parse_see_also_section(self, section):
-        lines = self._consume_to_next_section()
-        try:
-            return self._parse_numpydoc_see_also_section(lines)
-        except ValueError:
-            return self._format_admonition('seealso', lines)
-
-    def _parse_numpydoc_see_also_section(self, content):
-        """
-        Derived from the NumpyDoc implementation of _parse_see_also.
-
-        See Also
-        --------
-        func_name : Descriptive text
-            continued text
-        another_func_name : Descriptive text
-        func_name1, func_name2, :meth:`func_name`, func_name3
-
-        """
-        items = []
-
-        def parse_item_name(text):
-            """Match ':role:`name`' or 'name'"""
-            m = self._name_rgx.match(text)
-            if m:
-                g = m.groups()
-                if g[1] is None:
-                    return g[3], None
-                else:
-                    return g[2], g[1]
-            raise ValueError("%s is not a item name" % text)
-
-        def push_item(name, rest):
-            if not name:
-                return
-            name, role = parse_item_name(name)
-            items.append((name, list(rest), role))
-            del rest[:]
-
-        current_func = None
-        rest = []
-
-        for line in content:
-            if not line.strip():
-                continue
-
-            m = self._name_rgx.match(line)
-            if m and line[m.end():].strip().startswith(':'):
-                push_item(current_func, rest)
-                current_func, line = line[:m.end()], line[m.end():]
-                rest = [line.split(':', 1)[1].strip()]
-                if not rest[0]:
-                    rest = []
-            elif not line.startswith(' '):
-                push_item(current_func, rest)
-                current_func = None
-                if ',' in line:
-                    for func in line.split(','):
-                        if func.strip():
-                            push_item(func, [])
-                elif line.strip():
-                    current_func = line
-            elif current_func is not None:
-                rest.append(line.strip())
-        push_item(current_func, rest)
-
-        if not items:
-            return []
-
-        roles = {
-            'method': 'meth',
-            'meth': 'meth',
-            'function': 'func',
-            'func': 'func',
-            'class': 'class',
-            'exception': 'exc',
-            'exc': 'exc',
-            'object': 'obj',
-            'obj': 'obj',
-            'module': 'mod',
-            'mod': 'mod',
-            'data': 'data',
-            'constant': 'const',
-            'const': 'const',
-            'attribute': 'attr',
-            'attr': 'attr'
-        }
-        if self._what is None:
-            func_role = 'obj'
-        else:
-            func_role = roles.get(self._what, '')
-        lines = []
-        last_had_desc = True
-        for func, desc, role in items:
-            if role:
-                link = ':%s:`%s`' % (role, func)
-            elif func_role:
-                link = ':%s:`%s`' % (func_role, func)
-            else:
-                link = "`%s`_" % func
-            if desc or last_had_desc:
-                lines += ['']
-                lines += [link]
-            else:
-                lines[-1] += ", %s" % link
-            if desc:
-                lines += self._indent([' '.join(desc)])
-                last_had_desc = True
-            else:
-                last_had_desc = False
-        lines += ['']
-
-        return self._format_admonition('seealso', lines)
