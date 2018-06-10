@@ -12,7 +12,6 @@ from docutils import io
 from docutils.utils import SystemMessage
 from docutils.nodes import Element
 from docutils.readers.standalone import Reader as _Reader
-from doc484.parsers import Config, GoogleDocstring, NumpyDocstring
 
 YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
 NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
@@ -175,7 +174,6 @@ class RestBaseFormat(DocstringFormat):
     Base class for all types that convert to restructuredText as a common
     parsing format
     """
-    config = Config(napoleon_use_param=True, napoleon_use_rtype=True)
 
     def to_rest(self, docstring):
         """
@@ -272,7 +270,7 @@ class RestFormat(RestBaseFormat):
         return _cleandoc(docstring)
 
 
-class NumpyFormat(RestBaseFormat):
+class NumpyFormat(DocstringFormat):
     name = 'numpy'
     sections = compile(
         r'(\n|^)Parameters\n----------\n',
@@ -280,13 +278,13 @@ class NumpyFormat(RestBaseFormat):
         r'(\n|^)Yields\n------\n'
     )
 
-    def to_rest(self, docstring):
-        parser = NumpyDocstring(_cleandoc(docstring), self.config)
-        parser.parse()
-        return str(parser)
+    def parse(self, docstring):
+        from doc484.parsers import NumpyDocstring
+        parser = NumpyDocstring(_cleandoc(docstring))
+        return parser.parse()
 
 
-class GoogleFormat(RestBaseFormat):
+class GoogleFormat(DocstringFormat):
     name = 'google'
     sections = compile(
         r'(\n|^)Args:\n',
@@ -294,10 +292,10 @@ class GoogleFormat(RestBaseFormat):
         r'(\n|^)Yields:\n'
     )
 
-    def to_rest(self, docstring):
-        parser = GoogleDocstring(_cleandoc(docstring), self.config)
-        parser.parse()
-        return str(parser)
+    def parse(self, docstring):
+        from doc484.parsers import GoogleDocstring
+        parser = GoogleDocstring(_cleandoc(docstring))
+        return parser.parse()
 
 
 default_format = RestFormat
