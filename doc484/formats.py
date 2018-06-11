@@ -6,18 +6,12 @@ from collections import OrderedDict
 
 from typing import List, Tuple, Dict, Optional, TYPE_CHECKING, Type as Class
 
-import docutils.nodes
-from docutils.core import Publisher
-from docutils import io
-from docutils.utils import SystemMessage
-from docutils.nodes import Element
-from docutils.readers.standalone import Reader as _Reader
-
-from doc484.parsers import GoogleDocstring, NumpyDocstring, Arg
+from doc484.parsers import Arg
+from doc484.parsers.other import GoogleDocstring, NumpyDocstring
+from doc484.parsers.rest import RestDocstring
 
 YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
 NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
-
 NAMED_RESULTS_REG = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*\s+\(([^)]+)\)')
 
 logging.basicConfig()
@@ -37,66 +31,12 @@ def _cleandoc(docstring):
     return inspect.cleandoc(docstring).replace('`', '')
 
 
-def _clean_type(s):
-    return s.strip().replace('\n', ' ')
-
-
 def compile(*regexs):
     # type: (str) -> List[re.Pattern]
     return [re.compile(s) for s in regexs]
 
 
-class Reader(_Reader):
-    doc_format = None  # type: DocstringFormat
-
-    def pass_to_format_logger(self, msg):
-        # print(msg.attributes, msg.children)
-
-        if msg['type'] == 'ERROR':
-            log = self.doc_format.error
-        elif msg['type'] == 'WARNING':
-            log = self.doc_format.warning
-        else:
-            return
-        log(Element.astext(msg), line=msg['line'])
-
-    def new_document(self):
-        document = _Reader.new_document(self)
-        document.reporter.stream = False
-        document.reporter.attach_observer(self.pass_to_format_logger)
-        return document
-
-
-def publish_doctree(source, doc_format):
-    # type: (str, DocstringFormat) -> docutils.nodes.Node
-    """
-    Set up & run a `Publisher` for programmatic use with string I/O.
-    Return the document tree.
-
-    For encoded string input, be sure to set the 'input_encoding' setting to
-    the desired encoding.  Set it to 'unicode' for unencoded Unicode string
-    input.  Here's one way::
-
-        publish_doctree(..., settings_overrides={'input_encoding': 'unicode'})
-
-    Parameters: see `publish_programmatically`.
-    """
-    pub = Publisher(reader=None, parser=None, writer=None,
-                    settings=None,
-                    source_class=io.StringInput,
-                    destination_class=io.NullOutput)
-    pub.reader = Reader(None, 'restructuredtext')
-    pub.reader.doc_format = doc_format
-    pub.set_writer('null')
-    pub.parser = pub.reader.parser
-    pub.process_programmatic_settings(None, None, None)
-    pub.set_source(source, None)
-    pub.set_destination(None, None)
-    output = pub.publish(enable_exit_status=False)
-    return pub.document
-
-
-class DocstringFormat:
+class DocstringFormat(object):
     name = ''
     sections = None  # type: List[str]
 
@@ -156,106 +96,6 @@ class DocstringFormat:
         """
         return any(s.search(docstring) for s in cls.sections)
 
-    def parse(self, docstring):
-        """
-        Parameters
-        ----------
-        docstring : str
-
-        Returns
-        -------
-        Tuple[OrderedDict[str, Arg], Optional[Arg]]
-        """
-        raise NotImplementedError
-
-
-class RestFormat(DocstringFormat):
-
-    name = 'rest'
-    sections = compile(
-        r'(\n|^):param ',
-        r'(\n|^):rtype:',
-        r'(\n|^):Yields:'
-    )
-
-    def parse(self, docstring):
-        """
-        Parameters
-        ----------
-        docstring : str
-
-        Returns
-        -------
-        Tuple[OrderedDict[str, Arg], Optional[Arg]]
-        """
-        docstring = _cleandoc(docstring)
-        params = OrderedDict()
-        result = None  # type: Arg
-
-        try:
-            document = publish_doctree(docstring, self)
-        except SystemMessage:
-            return params, result
-
-        for field in document.traverse(condition=docutils.nodes.field):
-            field_name = field.traverse(condition=docutils.nodes.field_name)[0]
-            data = field_name.astext()
-            # data is e.g.  'type foo'
-            parts = data.strip().split()
-            if len(parts) == 1 and parts[0] == 'returns':
-                # converted google/numpy format with named results:
-                # * **result1** (*str*) -- Description of first item
-                # * **result2** (*bool*)
-                # * **result3** (*int*) -- Description of third item
-                # * *other stuff that is not return value.*
-                items = field.traverse(condition=docutils.nodes.list_item)
-                if items:
-                    if self.options.get('allow_named_results', True):
-                        item_types = []
-                        for item in items:
-                            text = item.astext()
-                            m = NAMED_RESULTS_REG.match(text)
-                            if m:
-                                item_types.append(m.group(1))
-                            else:
-                                break
-                        if len(item_types) == 1:
-                            result = Arg(item_types[0], field.line)
-                        elif len(item_types) > 1:
-                            result = Arg('Tuple[%s]' % ', '.join(item_types),
-                                         field.line)
-                    else:
-                        # special case to print warning for named return values
-                        self.warning(NAMED_ITEMS_ERROR, field.line)
-            elif len(parts) == 1 or (len(parts) == 2 and parts[0] == 'type'):
-                paras = field.traverse(condition=docutils.nodes.paragraph)
-                if not paras:
-                    continue
-                paragraph = paras[0]
-                arg = Arg(_clean_type(paragraph.astext()), paragraph.line)
-                if len(parts) == 2:
-                    # e.g. :type foo: xxxx
-                    kind, name = parts
-                    params[name] = arg
-                elif len(parts) == 1 and parts[0] == 'rtype':
-                    # e.g. :rtype: xxxx
-                    result = arg
-                elif len(parts) == 1 and parts[0] == 'Yields':
-                    # e.g. converted from numpy/google format
-                    self.warning(YIELDS_ERROR, paragraph.line)
-
-        return params, result
-
-
-class NumpyFormat(DocstringFormat):
-    name = 'numpy'
-    sections = compile(
-        r'(\n|^)Parameters\n----------\n',
-        r'(\n|^)Returns\n-------\n',
-        r'(\n|^)Yields\n------\n'
-    )
-    parser = NumpyDocstring
-
     def _cast_pararms(self, params):
         if params is not None:
             return OrderedDict(params)
@@ -274,12 +114,52 @@ class NumpyFormat(DocstringFormat):
             else:
                 self.warning(NAMED_ITEMS_ERROR, _returns[0].line)
 
+    def get_parser(self, docstring):
+        raise NotImplementedError
+
     def parse(self, docstring):
-        p = self.parser(_cleandoc(docstring))
+        """
+        Parameters
+        ----------
+        docstring : str
+
+        Returns
+        -------
+        Tuple[OrderedDict[str, Arg], Optional[Arg]]
+        """
+        p = self.get_parser(_cleandoc(docstring))
         params, _returns, _yields = p.parse()
         if _yields:
             self.warning(YIELDS_ERROR, _yields[0].line)
         return self._cast_pararms(params), self._cast_returns(_returns)
+
+
+class RestFormat(DocstringFormat):
+
+    name = 'rest'
+    sections = compile(
+        r'(\n|^):param ',
+        r'(\n|^):rtype:',
+        r'(\n|^):Yields:'
+    )
+
+    parser = RestDocstring
+
+    def get_parser(self, docstring):
+        return self.parser(docstring, self)
+
+
+class NumpyFormat(DocstringFormat):
+    name = 'numpy'
+    sections = compile(
+        r'(\n|^)Parameters\n----------\n',
+        r'(\n|^)Returns\n-------\n',
+        r'(\n|^)Yields\n------\n'
+    )
+    parser = NumpyDocstring
+
+    def get_parser(self, docstring):
+        return self.parser(docstring)
 
 
 class GoogleFormat(DocstringFormat):
@@ -291,9 +171,8 @@ class GoogleFormat(DocstringFormat):
     )
     parser = GoogleDocstring
 
-    def parse(self, docstring):
-        p = self.parser(_cleandoc(docstring))
-        return p.parse()
+    def get_parser(self, docstring):
+        return self.parser(docstring)
 
 
 default_format = RestFormat

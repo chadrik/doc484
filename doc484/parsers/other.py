@@ -36,14 +36,12 @@ import re
 from six import string_types
 from six.moves import range
 
+from doc484.parsers import Arg
+
 from typing import *
 
 SENTINEL = (None, None)
 
-Arg = NamedTuple('Arg', [
-    ('type', str),
-    ('line', int),
-])
 
 _directive_regex = re.compile(r'\.\. \S+::')
 _google_section_regex = re.compile(r'^(\s|\w)+:\s*$')
@@ -280,7 +278,7 @@ class GoogleDocstring(object):
 
     _directive_sections = []
 
-    def __init__(self, docstring, config=None):
+    def __init__(self, docstring):
 
         if isinstance(docstring, string_types):
             docstring = docstring.splitlines()
@@ -568,6 +566,7 @@ class NumpyDocstring(GoogleDocstring):
         else:
             _name = line
             _type = ''
+
         _name, _type = _name.strip(), _type.strip()
         _name = self._escape_args_and_kwargs(_name)
 
@@ -579,7 +578,8 @@ class NumpyDocstring(GoogleDocstring):
 
     def _consume_returns_section(self):
         # type: () -> List[Arg]
-        return [x[1] for x in self._consume_fields(prefer_type=True)]
+        fields = self._consume_fields(prefer_type=True)
+        return [x[1] for x in fields]
 
     def _consume_section_header(self):
         section, _ = next(self._line_iter)

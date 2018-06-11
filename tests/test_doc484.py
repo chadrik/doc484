@@ -135,7 +135,7 @@ def test_numpydoc_yields():
     ctx, result = convert(s)
     assert ctx.warning.call_args_list == [
         call(YIELDS_ERROR,
-             extra={'column': 0, 'line': 1, 'file': '<string>'})
+             extra={'column': 0, 'line': 4, 'file': '<string>'})
     ]
 
 
@@ -165,6 +165,7 @@ def test_numpydoc_tuple_result():
         result3 : Dict[str, int]
             Description of third item
             That trails to next line
+
         other stuff that is not return value.
     '''
     format = get_format(s)
@@ -172,10 +173,10 @@ def test_numpydoc_tuple_result():
     ctx, result = convert(s, options={'allow_named_results': False})
     assert ctx.warning.call_args_list == [
         call(NAMED_ITEMS_ERROR,
-             extra={'column': 0, 'line': 1, 'file': '<string>'})
+             extra={'column': 0, 'line': 4, 'file': '<string>'})
     ]
     assert parse(s, options={'allow_named_results': True}) == [
-        ('return', ('Tuple[str, bool, Dict[str, int]]', 1))
+        ('return', ('Tuple[str, bool, Dict[str, int]]', 4))
     ]
 
 
