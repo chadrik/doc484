@@ -33,34 +33,17 @@ from __future__ import absolute_import, print_function
 import collections
 import re
 
-from six import string_types, u
+from six import string_types
 from six.moves import range
-from six import PY3
 
-from doc484.formats import Arg
-
-if False:
-    from typing import *
-
-if PY3:
-    class UnicodeMixin:
-        """Mixin class to handle defining the proper __str__/__unicode__
-        methods in Python 2 or 3."""
-
-        def __str__(self):
-            return self.__unicode__()
-
-
-else:
-
-    class UnicodeMixin(object):
-        """Mixin class to handle defining the proper __str__/__unicode__
-        methods in Python 2 or 3."""
-
-        def __str__(self):
-            return self.__unicode__().encode('utf8')
+from typing import *
 
 SENTINEL = (None, None)
+
+Arg = NamedTuple('Arg', [
+    ('type', str),
+    ('line', int),
+])
 
 _directive_regex = re.compile(r'\.\. \S+::')
 _google_section_regex = re.compile(r'^(\s|\w)+:\s*$')
@@ -293,70 +276,8 @@ class modify_iter(peek_iter):
                 self._cache.append(self.sentinel)
 
 
-class GoogleDocstring(UnicodeMixin):
-    """Convert Google style docstrings to reStructuredText.
+class GoogleDocstring(object):
 
-    Parameters
-    ----------
-    docstring : str or List[str]
-        The docstring to parse, given either as a string or split into
-        individual lines.
-    config : Optional[sphinx.ext.napoleon.Config or sphinx.config.Config]
-        The configuration settings to use. If not given, defaults to the
-        config object on `app`; or if `app` is not given defaults to the
-        a new `sphinx.ext.napoleon.Config` object.
-
-        See Also
-        --------
-        :class:`sphinx.ext.napoleon.Config`
-
-    Other Parameters
-    ----------------
-    app : Optional[sphinx.application.Sphinx]
-        Application object representing the Sphinx process.
-    what : Optional[str]
-        A string specifying the type of the object to which the docstring
-        belongs. Valid values: "module", "class", "exception", "function",
-        "method", "attribute".
-    name : Optional[str]
-        The fully qualified name of the object.
-    obj : module, class, exception, function, method, or attribute
-        The object to which the docstring belongs.
-    options : Optional[sphinx.ext.autodoc.Options]
-        The options given to the directive: an object with attributes
-        inherited_members, undoc_members, show_inheritance and noindex that
-        are True if the flag option of same name was given to the auto
-        directive.
-
-    Example
-    -------
-    >>> from sphinx.ext.napoleon import Config
-    >>> config = Config(napoleon_use_param=True, napoleon_use_rtype=True)
-    >>> docstring = '''One line summary.
-    ...
-    ... Extended description.
-    ...
-    ... Args:
-    ...   arg1(int): Description of `arg1`
-    ...   arg2(str): Description of `arg2`
-    ... Returns:
-    ...   str: Description of return value.
-    ... '''
-    >>> print(GoogleDocstring(docstring, config))
-    One line summary.
-    <BLANKLINE>
-    Extended description.
-    <BLANKLINE>
-    :param arg1: Description of `arg1`
-    :type arg1: int
-    :param arg2: Description of `arg2`
-    :type arg2: str
-    <BLANKLINE>
-    :returns: Description of return value.
-    :rtype: str
-    <BLANKLINE>
-
-    """
     _directive_sections = []
 
     def __init__(self, docstring, config=None):
@@ -371,13 +292,12 @@ class GoogleDocstring(UnicodeMixin):
             return line.rstrip(), self._lineno
 
         self._line_iter = modify_iter(docstring, SENTINEL, modifier=next_line)
-        self._parsed_lines = []
         self._is_in_section = False
         self._section_indent = 0
 
-        self._params = None
-        self._returns = None
-        self._yields = None
+        self._params = None  # type: Optional[List[Tuple[str, Arg]]]
+        self._returns = None  # type: Optional[List[Arg]]
+        self._yields = None  # type: Optional[List[Arg]]
 
         self._sections = {
             'args': self._parse_parameters_section,
@@ -404,28 +324,6 @@ class GoogleDocstring(UnicodeMixin):
             'yield': self._parse_yields_section,
             'yields': self._parse_yields_section,
         }
-
-    def __unicode__(self):
-        """Return the parsed docstring in reStructuredText format.
-
-        Returns
-        -------
-        unicode
-            Unicode version of the docstring.
-
-        """
-        return u('\n').join(self.lines())
-
-    def lines(self):
-        """Return the parsed lines of the docstring in reStructuredText format.
-
-        Returns
-        -------
-        List[str]
-            The lines of the docstring in a list.
-
-        """
-        return self._parsed_lines
 
     def _consume_indented_block(self, indent=1):
         # type: () -> List[Tuple[str, int]]
@@ -459,7 +357,8 @@ class GoogleDocstring(UnicodeMixin):
         line, lineno = next(self._line_iter)
 
         before, colon, after = self._partition_field_on_colon(line, lineno)
-        _name, _type, _desc = before, '', after
+        _name = before
+        _type = ''
 
         if parse_type:
             match = _google_typed_arg_regex.match(before)
@@ -486,7 +385,7 @@ class GoogleDocstring(UnicodeMixin):
         return fields
 
     def _consume_returns_section(self):
-        # type: () -> Optional[Arg]
+        # type: () -> List[Arg]
         lines = self._dedent(self._consume_to_next_section())
         if lines:
             line, lineno = lines[0]
@@ -500,9 +399,9 @@ class GoogleDocstring(UnicodeMixin):
                 else:
                     _type = before
 
-            return Arg(_type, lineno)
+            return [Arg(_type, lineno)]
         else:
-            return None
+            return []
 
     def _consume_section_header(self):
         section, _ = next(self._line_iter)
@@ -577,23 +476,6 @@ class GoogleDocstring(UnicodeMixin):
                 return False
         return False
 
-    def _is_list(self, lines):
-        if not lines:
-            return False
-        if _bullet_list_regex.match(lines[0]):
-            return True
-        if _enumerated_list_regex.match(lines[0]):
-            return True
-        if len(lines) < 2 or lines[0].endswith('::'):
-            return False
-        indent = self._get_indent(lines[0])
-        next_indent = indent
-        for line in lines[1:]:
-            if line:
-                next_indent = self._get_indent(line)
-                break
-        return next_indent > indent
-
     def _is_section_header(self):
         section = self._line_iter.peek().lower()
         match = _google_section_regex.match(section)
@@ -617,7 +499,7 @@ class GoogleDocstring(UnicodeMixin):
                     not self._is_indented(line[0], self._section_indent)))
 
     def parse(self):
-        self._parsed_lines = self._consume_empty()
+        self._consume_empty()
 
         while self._line_iter.has_next():
             if self._is_section_header():
@@ -626,36 +508,32 @@ class GoogleDocstring(UnicodeMixin):
                     self._is_in_section = True
                     self._section_indent = self._get_current_indent()
                     if _directive_regex.match(section):
-                        lines = [section] + self._consume_to_next_section()
+                        self._consume_to_next_section()
                     else:
-                        lines = self._sections[section.lower()](section)
+                        self._sections[section.lower()]()
                 finally:
                     self._is_in_section = False
                     self._section_indent = 0
             else:
-                if not self._parsed_lines:
-                    lines = self._consume_contiguous() + self._consume_empty()
-                else:
-                    lines = self._consume_to_next_section()
-            self._parsed_lines.extend(lines)
+                # FIXME: behavior varied based on parsed lines, which we removed
+                # if not self._parsed_lines:
+                #     self._consume_contiguous() + self._consume_empty()
+                # else:
+                self._consume_to_next_section()
 
-        return self._params or {}, self._returns
+        return self._params, self._returns, self._yields
 
-    def _skip_section(self, section):
+    def _skip_section(self):
         self._consume_to_next_section()
-        return []
 
-    def _parse_parameters_section(self, section):
-        self._params = dict(self._consume_fields())
-        return []
+    def _parse_parameters_section(self):
+        self._params = self._consume_fields()
 
-    def _parse_returns_section(self, section):
+    def _parse_returns_section(self):
         self._returns = self._consume_returns_section()
-        return []
 
-    def _parse_yields_section(self, section):
+    def _parse_yields_section(self):
         self._yields = self._consume_returns_section()
-        return []
 
     def _partition_field_on_colon(self, line, lineno):
         before_colon = []
@@ -678,121 +556,9 @@ class GoogleDocstring(UnicodeMixin):
                 colon,
                 "".join(after_colon).strip())
 
-    def _strip_empty(self, lines):
-        if lines:
-            start = -1
-            for i, line in enumerate(lines):
-                if line:
-                    start = i
-                    break
-            if start == -1:
-                lines = []
-            end = -1
-            for i in reversed(range(len(lines))):
-                line = lines[i]
-                if line:
-                    end = i
-                    break
-            if start > 0 or end + 1 < len(lines):
-                lines = lines[start:end + 1]
-        return lines
-
 
 class NumpyDocstring(GoogleDocstring):
-    """Convert NumPy style docstrings to reStructuredText.
 
-    Parameters
-    ----------
-    docstring : str or List[str]
-        The docstring to parse, given either as a string or split into
-        individual lines.
-    config : Optional[sphinx.ext.napoleon.Config or sphinx.config.Config]
-        The configuration settings to use. If not given, defaults to the
-        config object on `app`; or if `app` is not given defaults to the
-        a new `sphinx.ext.napoleon.Config` object.
-
-        See Also
-        --------
-        :class:`sphinx.ext.napoleon.Config`
-
-    Other Parameters
-    ----------------
-    app : Optional[sphinx.application.Sphinx]
-        Application object representing the Sphinx process.
-    what : Optional[str]
-        A string specifying the type of the object to which the docstring
-        belongs. Valid values: "module", "class", "exception", "function",
-        "method", "attribute".
-    name : Optional[str]
-        The fully qualified name of the object.
-    obj : module, class, exception, function, method, or attribute
-        The object to which the docstring belongs.
-    options : Optional[sphinx.ext.autodoc.Options]
-        The options given to the directive: an object with attributes
-        inherited_members, undoc_members, show_inheritance and noindex that
-        are True if the flag option of same name was given to the auto
-        directive.
-
-    Example
-    -------
-    >>> from sphinx.ext.napoleon import Config
-    >>> config = Config(napoleon_use_param=True, napoleon_use_rtype=True)
-    >>> docstring = '''One line summary.
-    ...
-    ... Extended description.
-    ...
-    ... Parameters
-    ... ----------
-    ... arg1 : int
-    ...     Description of `arg1`
-    ... arg2 : str
-    ...     Description of `arg2`
-    ... Returns
-    ... -------
-    ... str
-    ...     Description of return value.
-    ... '''
-    >>> print(NumpyDocstring(docstring, config))
-    One line summary.
-    <BLANKLINE>
-    Extended description.
-    <BLANKLINE>
-    :param arg1: Description of `arg1`
-    :type arg1: int
-    :param arg2: Description of `arg2`
-    :type arg2: str
-    <BLANKLINE>
-    :returns: Description of return value.
-    :rtype: str
-    <BLANKLINE>
-
-    Methods
-    -------
-    __str__()
-        Return the parsed docstring in reStructuredText format.
-
-        Returns
-        -------
-        str
-            UTF-8 encoded version of the docstring.
-
-    __unicode__()
-        Return the parsed docstring in reStructuredText format.
-
-        Returns
-        -------
-        unicode
-            Unicode version of the docstring.
-
-    lines()
-        Return the parsed lines of the docstring in reStructuredText format.
-
-        Returns
-        -------
-        List[str]
-            The lines of the docstring in a list.
-
-    """
     _directive_sections = ['.. index::']
 
     def _consume_field(self, parse_type=True, prefer_type=False):
@@ -800,7 +566,8 @@ class NumpyDocstring(GoogleDocstring):
         if parse_type:
             _name, _, _type = self._partition_field_on_colon(line, lineno)
         else:
-            _name, _type = line, ''
+            _name = line
+            _type = ''
         _name, _type = _name.strip(), _type.strip()
         _name = self._escape_args_and_kwargs(_name)
 
@@ -811,14 +578,8 @@ class NumpyDocstring(GoogleDocstring):
         return _name, _type, lineno
 
     def _consume_returns_section(self):
-        # type: () -> Optional[Arg]
-        fields = [x[1] for x in self._consume_fields(prefer_type=True)]
-
-        if len(fields) == 1:
-            return fields[0]
-        elif fields:
-            return Arg('Tuple[%s]' % ', '.join([x.type for x in fields]),
-                       fields[0].line)
+        # type: () -> List[Arg]
+        return [x[1] for x in self._consume_fields(prefer_type=True)]
 
     def _consume_section_header(self):
         section, _ = next(self._line_iter)

@@ -4,7 +4,7 @@ import inspect
 import logging
 from collections import OrderedDict
 
-from typing import List, Tuple, Dict, NamedTuple, Optional, TYPE_CHECKING, Type as Class
+from typing import List, Tuple, Dict, Optional, TYPE_CHECKING, Type as Class
 
 import docutils.nodes
 from docutils.core import Publisher
@@ -13,15 +13,12 @@ from docutils.utils import SystemMessage
 from docutils.nodes import Element
 from docutils.readers.standalone import Reader as _Reader
 
+from doc484.parsers import GoogleDocstring, NumpyDocstring, Arg
+
 YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
 NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
 
 NAMED_RESULTS_REG = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*\s+\(([^)]+)\)')
-
-Arg = NamedTuple('Arg', [
-    ('type', str),
-    ('line', int),
-])
 
 logging.basicConfig()
 
@@ -108,9 +105,10 @@ class DocstringFormat:
         Parameters
         ----------
         line : int
-        logger
+            start line of the docstring
+        logger : Optional[logging.Logger]
         """
-        self.logger = logger or _logger  # type: logging.Logger
+        self.logger = logger or _logger
         self.line = line
         self.filename = filename
         self.options = options or {}
@@ -146,6 +144,8 @@ class DocstringFormat:
     @classmethod
     def matches(cls, docstring):
         """
+        Return whether `docstring` is compatible with this format.
+
         Parameters
         ----------
         docstring : str
@@ -164,30 +164,19 @@ class DocstringFormat:
 
         Returns
         -------
-        Tuple[Dict[str, Arg], Optional[Arg]]
+        Tuple[OrderedDict[str, Arg], Optional[Arg]]
         """
         raise NotImplementedError
 
 
-class RestBaseFormat(DocstringFormat):
-    """
-    Base class for all types that convert to restructuredText as a common
-    parsing format
-    """
+class RestFormat(DocstringFormat):
 
-    def to_rest(self, docstring):
-        """
-        Convert a docstring from the native format to rest
-
-        Parameters
-        ----------
-        docstring : str
-
-        Returns
-        -------
-        str
-        """
-        raise NotImplementedError
+    name = 'rest'
+    sections = compile(
+        r'(\n|^):param ',
+        r'(\n|^):rtype:',
+        r'(\n|^):Yields:'
+    )
 
     def parse(self, docstring):
         """
@@ -197,9 +186,9 @@ class RestBaseFormat(DocstringFormat):
 
         Returns
         -------
-        Tuple[Dict[str, Arg], Optional[Arg]]
+        Tuple[OrderedDict[str, Arg], Optional[Arg]]
         """
-        docstring = self.to_rest(docstring)
+        docstring = _cleandoc(docstring)
         params = OrderedDict()
         result = None  # type: Arg
 
@@ -258,18 +247,6 @@ class RestBaseFormat(DocstringFormat):
         return params, result
 
 
-class RestFormat(RestBaseFormat):
-    name = 'rest'
-    sections = compile(
-        r'(\n|^):param ',
-        r'(\n|^):rtype:',
-        r'(\n|^):Yields:'
-    )
-
-    def to_rest(self, docstring):
-        return _cleandoc(docstring)
-
-
 class NumpyFormat(DocstringFormat):
     name = 'numpy'
     sections = compile(
@@ -277,11 +254,32 @@ class NumpyFormat(DocstringFormat):
         r'(\n|^)Returns\n-------\n',
         r'(\n|^)Yields\n------\n'
     )
+    parser = NumpyDocstring
+
+    def _cast_pararms(self, params):
+        if params is not None:
+            return OrderedDict(params)
+        else:
+            return OrderedDict()
+
+    def _cast_returns(self, _returns):
+        if not _returns:
+            return None
+        elif len(_returns) == 1:
+            return _returns[0]
+        else:
+            if self.options.get('allow_named_results', True):
+                return Arg('Tuple[%s]' % ', '.join([x.type for x in _returns]),
+                           _returns[0].line)
+            else:
+                self.warning(NAMED_ITEMS_ERROR, _returns[0].line)
 
     def parse(self, docstring):
-        from doc484.parsers import NumpyDocstring
-        parser = NumpyDocstring(_cleandoc(docstring))
-        return parser.parse()
+        p = self.parser(_cleandoc(docstring))
+        params, _returns, _yields = p.parse()
+        if _yields:
+            self.warning(YIELDS_ERROR, _yields[0].line)
+        return self._cast_pararms(params), self._cast_returns(_returns)
 
 
 class GoogleFormat(DocstringFormat):
@@ -291,11 +289,11 @@ class GoogleFormat(DocstringFormat):
         r'(\n|^)Returns:\n',
         r'(\n|^)Yields:\n'
     )
+    parser = GoogleDocstring
 
     def parse(self, docstring):
-        from doc484.parsers import GoogleDocstring
-        parser = GoogleDocstring(_cleandoc(docstring))
-        return parser.parse()
+        p = self.parser(_cleandoc(docstring))
+        return p.parse()
 
 
 default_format = RestFormat
@@ -333,7 +331,7 @@ def parse_docstring(docstring, line=0, filename='<string>', logger=None,
 
     Returns
     -------
-    Tuple[Dict[str, Arg], Optional[Arg]]
+    Tuple[OrderedDict[str, Arg], Optional[Arg]]
     """
     if default_format == 'auto':
         format_cls = guess_format(docstring)
