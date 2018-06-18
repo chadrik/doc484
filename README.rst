@@ -35,10 +35,13 @@ Before
 
     def maxlines(input, numlines=None):
         """
+        Trim a string to a maximum number of lines.
+
         Parameters
         ----------
         input : str
         numlines : Optional[int]
+            maximum number of lines
 
         Returns
         -------
@@ -59,10 +62,13 @@ After
     def maxlines(input, numlines=None):
         # type: (str, Optional[int]) -> str
         """
+        Trim a string to a maximum number of lines.
+
         Parameters
         ----------
         input : str
         numlines : Optional[int]
+            maximum number of lines
 
         Returns
         -------
@@ -87,11 +93,15 @@ Usage
 =====
 
 .. code::
+
     doc484 -h
 
+Check the scripts directory for an example of how to automatically run
+`doc484` on modified files in your repository.
 
 TODO
 ====
 - automatically insert `typing` imports
 - convert docstrings to function annotations (for python 3.5+)
 - add argument for docstring format (or read from setup.cfg)
+- convert `doctypes` to python?
