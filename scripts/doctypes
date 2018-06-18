@@ -1,0 +1,58 @@
+#!/bin/bash
+
+function gitfiles() {
+    root=$(git rev-parse --show-toplevel 2> /dev/null)
+    if [ -z "$root" ]; then
+        exit 1
+    fi
+    if [ "$1" == "." ]; then
+        # FIXME: limit to the paths below pwd
+        # echo "Processing all files in repository"
+        paths=$(git ls-files | grep "\.py$" | awk -v root="$root" '{print root"/"$1}')
+        echo $paths
+    else
+        # echo "Processing modified in repository"
+        paths=$({ git diff --name-only ; git diff --name-only --staged ; } | sort | uniq | grep "\.py$" | awk -v root="$root" '{print root"/"$1}')
+        echo $paths
+    fi
+}
+
+function hgfiles() {
+    root=$(hg root 2> /dev/null)
+    if [ -z "$root" ]; then
+        exit 1
+    fi
+    if [ "$1" == "." ]; then
+        # FIXME: limit to the paths below pwd
+        # echo "Processing all files in repository"
+        paths=$(hg manifest | grep "\.py$" | awk -v root="$root" '{print root"/"$1}')
+        echo $paths
+    else
+        # echo "Processing modified in repository"
+        paths=$(hg status -m -a -n | grep "\.py$" | awk -v root="$root" '{print root"/"$1}')
+        echo $paths
+    fi
+}
+
+# generate python type comments from docstrings
+function doctypes() {
+    procs=12
+    if [[ -z "$1" || "$1" == "." ]]; then
+        # no paths given. find modified files in the current repo
+        paths=`gitfiles $1`
+        if [ $? -ne 0 ]; then
+            paths=`hgfiles $1`
+            if [ $? -ne 0 ]; then
+                echo "Error: could not find .git or .hg directory"
+                exit 1
+            fi
+        fi
+    else
+        # use provided paths
+        paths="$@"
+    fi
+    echo "Converting docstrings to type comments"
+    python -m doc484 --write --nobackups --no-diffs --processes=$procs $paths
+}
+
+doctypes "$@"
