@@ -8,7 +8,58 @@ import sys
 from lib2to3 import refactor
 from lib2to3.main import warn, StdoutRefactoringTool
 
+from doc484.compat import PY3
+
+if PY3:
+    from configparser import ConfigParser
+else:
+    from ConfigParser import SafeConfigParser as ConfigParser
+
+
 fixer_pkg = 'doc484.fixes'
+
+
+def apply_config(keys, options, path=None):
+    if not path:
+        path = os.getcwd()
+
+    config_file = os.path.join(path, 'setup.cfg')
+    parser = ConfigParser()
+    parser.read(config_file)
+
+    def addopt(key, typ, default):
+        if hasattr(options, key):
+            return
+
+        methname = 'get'
+        if typ != 'string':
+            methname += typ
+
+        method = getattr(parser, methname)
+
+        val = method('doc484', key, fallback=default)
+        setattr(options, key, val)
+
+    for key, typ, default in keys:
+        addopt(key, typ, default)
+
+
+def _get_options_data(parser):
+    defaults = parser.get_default_values().__dict__
+    keys = []
+    for opt in parser.option_list:
+        if opt.dest == 'config':
+            continue
+        opttype = opt.type
+        if opttype is None:
+            if opt.action in ['store_true', 'store_false']:
+                opttype = 'boolean'
+            elif opt.action in ['help', 'append']:
+                continue
+            else:
+                raise TypeError(opt.action)
+        keys.append((opt.dest, opttype, defaults[opt.dest]))
+    return keys
 
 
 # copied and modified from lib2to3.main
@@ -20,29 +71,34 @@ def main(args=None):
     # Set up option parser
     parser = optparse.OptionParser(usage="doc484 [options] file|dir ...")
     parser.add_option("-d", "--doctests_only", action="store_true",
-                      help="Fix up doctests only")
-    parser.add_option("-f", "--fix", action="append", default=[],
-                      help="Each FIX specifies a transformation; default: all")
+                      default=False, help="Fix up doctests only")
     parser.add_option("-j", "--processes", action="store", default=1,
                       type="int", help="Run 2to3 concurrently")
-    parser.add_option("-x", "--nofix", action="append", default=[],
-                      help="Prevent a transformation from being run")
-    parser.add_option("-l", "--list-fixes", action="store_true",
-                      help="List available transformations")
+    # parser.add_option("-f", "--fix", action="append", default=[],
+    #                   help="Each FIX specifies a transformation; default: all")
+    # parser.add_option("-x", "--nofix", action="append", default=[],
+    #                   help="Prevent a transformation from being run")
+    # parser.add_option("-l", "--list-fixes", action="store_true", default=False,
+    #                   help="List available transformations")
     parser.add_option("-p", "--print-function", action="store_true",
+                      default=False,
                       help="Modify the grammar so that print() is a function")
-    parser.add_option("-v", "--verbose", action="store_true",
+    parser.add_option("-v", "--verbose", action="store_true", default=False,
                       help="More verbose logging")
-    parser.add_option("--no-diffs", action="store_true",
+    parser.add_option("--no-diffs", action="store_true", default=False,
                       help="Don't show diffs of the refactoring")
-    parser.add_option("-w", "--write", action="store_true",
+    parser.add_option("-w", "--write", action="store_true", default=False,
                       help="Write back modified files")
     parser.add_option("-n", "--nobackups", action="store_true", default=False,
                       help="Don't write backups for modified files")
+    parser.add_option("-c", "--config", action="store", type="str",
+                      default=None, help="Read settings from the specified "
+                      "ini-style configuration file (defaults to `./setup.cfg'")
     parser.add_option("-o", "--output-dir", action="store", type="str",
                       default="", help="Put output files in this directory "
                       "instead of overwriting the input files.  Requires -n.")
     parser.add_option("-W", "--write-unchanged-files", action="store_true",
+                      default=False,
                       help="Also write files even if no changes were required"
                       " (useful with --output-dir); implies -w.")
     parser.add_option("--add-suffix", action="store", type="str", default="",
@@ -53,7 +109,15 @@ def main(args=None):
     # Parse command line arguments
     refactor_stdin = False
     flags = {}
-    options, args = parser.parse_args(args)
+
+    # pass in `values` to prevent defaults from being populated, so that
+    # values read from the config file can take precedence over defaults.
+    # order of precedence: specified options > config options > parser defaults
+    options, args = parser.parse_args(args, values=optparse.Values({}))
+
+    apply_config(_get_options_data(parser), options,
+                 path=getattr(options, 'config', None))
+
     if options.write_unchanged_files:
         flags["write_unchanged_files"] = True
         if not options.write:
@@ -67,17 +131,19 @@ def main(args=None):
         parser.error("Can't use --add-suffix without -n.")
 
     if not options.write and options.no_diffs:
-        warn("not writing files and not printing diffs; that's not very useful")
+        warn("not writing files and not printing diffs; that's not "
+             "very useful")
     if not options.write and options.nobackups:
         parser.error("Can't use -n without -w")
-    if options.list_fixes:
-        print("Available transformations for the -f/--fix option:")
-        for fixname in refactor.get_all_fix_names(fixer_pkg):
-            print(fixname)
-        if not args:
-            return 0
+    # if options.list_fixes:
+    #     print("Available transformations for the -f/--fix option:")
+    #     for fixname in refactor.get_all_fix_names(fixer_pkg):
+    #         print(fixname)
+    #     if not args:
+    #         return 0
     if not args:
-        print("At least one file or directory argument required.", file=sys.stderr)
+        print("At least one file or directory argument required.",
+              file=sys.stderr)
         print("Use --help to show usage.", file=sys.stderr)
         return 2
     if "-" in args:
@@ -93,21 +159,25 @@ def main(args=None):
     logging.basicConfig(format='%(name)s: %(message)s', level=level)
     logger = logging.getLogger('lib2to3.main')
 
+    # NOTE: removing this until we have more fixes
     # Initialize the refactoring tool
-    avail_fixes = set(refactor.get_fixers_from_package(fixer_pkg))
-    unwanted_fixes = set(fixer_pkg + ".fix_" + fix for fix in options.nofix)
+    # avail_fixes = set(refactor.get_fixers_from_package(fixer_pkg))
+    # unwanted_fixes = set(fixer_pkg + ".fix_" + fix for fix in options.nofix)
     explicit = set()
-    if options.fix:
-        all_present = False
-        for fix in options.fix:
-            if fix == "all":
-                all_present = True
-            else:
-                explicit.add(fixer_pkg + ".fix_" + fix)
-        requested = avail_fixes.union(explicit) if all_present else explicit
-    else:
-        requested = avail_fixes.union(explicit)
-    fixer_names = requested.difference(unwanted_fixes)
+    # if options.fix:
+    #     all_present = False
+    #     for fix in options.fix:
+    #         if fix == "all":
+    #             all_present = True
+    #         else:
+    #             explicit.add(fixer_pkg + ".fix_" + fix)
+    #     requested = avail_fixes.union(explicit) if all_present else explicit
+    # else:
+    #     requested = avail_fixes.union(explicit)
+    # fixer_names = requested.difference(unwanted_fixes)
+
+    fixer_names = {'doc484.fixes.fix_type_comments'}
+
     input_base_dir = os.path.commonprefix(args)
     if (input_base_dir and not input_base_dir.endswith(os.sep)
         and not os.path.isdir(input_base_dir)):
