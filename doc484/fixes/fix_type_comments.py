@@ -33,6 +33,10 @@ if False:
 number2symbol = python_grammar.number2symbol
 TYPE_REG = re.compile('\s*#\s*type:.*')
 
+SPECIAL_METHOD_RETURN = {
+    '__init__': 'None'
+}
+
 
 def _get_type(typ, default='Any'):
     return default if typ is None else typ
@@ -86,8 +90,7 @@ def keep_arg(i, arg_name, typ):
 
 
 class FixTypeComments(fixer_base.BaseFix):
-    run_order = 4 #use a lower order since lambda is part of other
-                  #patterns
+    run_order = 4  # use a lower order since lambda is part of other patterns
     BM_compatible = True
 
     PATTERN = """ 
@@ -122,7 +125,13 @@ class FixTypeComments(fixer_base.BaseFix):
         if docstring is None and name == '__init__' and class_suite is not None:
             # fall back to the class docstring
             docstring, line, _ = get_docstring(class_suite)
-        if docstring is None and not formats.default_arg_types:
+
+        has_type_comment = is_type_comment(comment)
+
+        # if we have a default argument map and there's no existing type comment
+        # then we can still proceed.
+        if docstring is None and not (formats.default_arg_types
+                                      and not has_type_comment):
             return
 
         types = []  # type: List[str]
@@ -164,10 +173,14 @@ class FixTypeComments(fixer_base.BaseFix):
             # no effect: don't bother with type comment
             return
 
-        typestr = '# type: (%s) -> %s\n' % (
-            ', '.join(types), _get_type(result, formats.default_return_type))
+        default_return = formats.default_return_type
+        if is_method and name in SPECIAL_METHOD_RETURN:
+            default_return = SPECIAL_METHOD_RETURN[name]
 
-        if comment and not is_type_comment(comment):
+        typestr = '# type: (%s) -> %s\n' % (', '.join(types),
+                                            _get_type(result, default_return))
+
+        if comment and not has_type_comment:
             # push existing non-type comment to next line
             typestr += comment
 

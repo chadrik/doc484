@@ -160,6 +160,34 @@ def foo(one, *two, **three):
     assert output == input
 
 
+def test_default_return_type():
+    input = '''\
+def foo(one):
+    """
+    Description of foo
+    
+    Parameters
+    ----------
+    one : str
+    """
+    pass
+'''
+    output = convert_string(input)
+
+    assert output == '''\
+def foo(one):
+    # type: (str) -> Any
+    """
+    Description of foo
+    
+    Parameters
+    ----------
+    one : str
+    """
+    pass
+'''
+
+
 def test_class():
     input = '''\
 class Bar:
@@ -261,7 +289,7 @@ class Foo:
     assert output == expected
 
 
-def test_no_change():
+def test_class_init_no_change():
     input = '''\
 class Foo:
     """
@@ -288,3 +316,5 @@ class Foo:
         pass
 '''
     assert output == expected
+
+
