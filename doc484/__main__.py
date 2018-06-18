@@ -99,7 +99,14 @@ def main(args=None):
                       default=False, help="Fix up doctests only")
     parser.add_option("-f", "--format",
                       choices=list(doc484.formats.format_map.keys()),
-                      help="Docstring convention")
+                      help="Docstring convention (by default this is "
+                      "automatically determined by inspecting each docstring "
+                      "but it is faster and more reliable to specify this "
+                      "explicitly)")
+    parser.add_option("--default-return-type",
+                      default='Any',
+                      help="Default type to use for undocumented return "
+                      "values (defaults to 'Any'")
     parser.add_option("-j", "--processes", action="store", default=1,
                       type="int", help="Run 2to3 concurrently")
     # parser.add_option("-f", "--fix", action="append", default=[],
@@ -147,6 +154,7 @@ def main(args=None):
                                      path=getattr(options, 'config', None))
 
     doc484.formats.default_arg_types.update(default_arg_types)
+    doc484.formats.default_return_type = options.default_return_type
 
     if options.format:
         if options.verbose:

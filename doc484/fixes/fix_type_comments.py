@@ -164,9 +164,8 @@ class FixTypeComments(fixer_base.BaseFix):
             # no effect: don't bother with type comment
             return
 
-        default_return = 'None'
-        typestr = '# type: (%s) -> %s\n' % (', '.join(types),
-                                            _get_type(result, default_return))
+        typestr = '# type: (%s) -> %s\n' % (
+            ', '.join(types), _get_type(result, formats.default_return_type))
 
         if comment and not is_type_comment(comment):
             # push existing non-type comment to next line

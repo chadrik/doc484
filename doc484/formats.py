@@ -21,6 +21,7 @@ _logger = logging.getLogger(__name__)
 
 # mapping of arg -> type annotation
 default_arg_types = {}  # type: Dict[str, str]
+default_return_type = 'Any'
 
 
 def _setup_logger(log):
