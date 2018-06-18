@@ -9,6 +9,7 @@ from lib2to3 import refactor
 from lib2to3.main import warn, StdoutRefactoringTool
 
 from doc484.compat import PY3
+import doc484.formats
 
 if PY3:
     from configparser import ConfigParser
@@ -32,7 +33,7 @@ def apply_config(keys, options, path=None):
             return
 
         methname = 'get'
-        if typ != 'string':
+        if typ not in ('string', 'choice'):
             methname += typ
 
         method = getattr(parser, methname)
@@ -72,6 +73,9 @@ def main(args=None):
     parser = optparse.OptionParser(usage="doc484 [options] file|dir ...")
     parser.add_option("-d", "--doctests_only", action="store_true",
                       default=False, help="Fix up doctests only")
+    parser.add_option("-f", "--format",
+                      choices=list(doc484.formats.format_map.keys()),
+                      help="Docstring convention")
     parser.add_option("-j", "--processes", action="store", default=1,
                       type="int", help="Run 2to3 concurrently")
     # parser.add_option("-f", "--fix", action="append", default=[],
@@ -117,6 +121,11 @@ def main(args=None):
 
     apply_config(_get_options_data(parser), options,
                  path=getattr(options, 'config', None))
+
+    if options.format:
+        if options.verbose:
+            print("Using %r format" % options.format)
+        doc484.formats.set_default_format(options.format)
 
     if options.write_unchanged_files:
         flags["write_unchanged_files"] = True

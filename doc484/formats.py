@@ -202,9 +202,37 @@ class GoogleFormat(DocstringFormat):
         return self.parser(docstring)
 
 
-default_format = RestFormat
-formats = [NumpyFormat, GoogleFormat, default_format]  # type: List[Type[DocstringFormat]]
+_default_format = None  # type: Optional[Type[DocstringFormat]]
+formats = [NumpyFormat, GoogleFormat, RestFormat]  # type: List[Type[DocstringFormat]]
 format_map = {f.name: f for f in formats}  # type: Dict[str, Type[DocstringFormat]]
+
+
+def set_default_format(format_name):
+    # type: (Optional[str]) -> Optional[Type[DocstringFormat]]
+    """
+    Parameters
+    ----------
+    format_name : Optional[str]
+
+    Returns
+    -------
+    Optional[Type[DocstringFormat]]
+    """
+    global _default_format
+    if format_name is None:
+        _default_format = None
+    _default_format = format_map[format_name]
+    return _default_format
+
+
+def get_default_format():
+    # type: () -> Optional[Type[DocstringFormat]]
+    """
+    Returns
+    -------
+    Optional[Type[DocstringFormat]]
+    """
+    return _default_format
 
 
 def guess_format(docstring):
@@ -229,8 +257,8 @@ def guess_format(docstring):
 
 
 def parse_docstring(docstring, line=0, filename='<string>', logger=None,
-                    default_format='auto', options=None):
-    # type: (str, int, Any, Optional[logging.Logger], Any, Any) -> Tuple[OrderedDict[str, Arg], Optional[Arg]]
+                    default_format=None, options=None):
+    # type: (str, int, Any, Optional[logging.Logger], Optional[str], Any) -> Tuple[OrderedDict[str, Arg], Optional[Arg]]
     """
     Parameters
     ----------
@@ -238,13 +266,19 @@ def parse_docstring(docstring, line=0, filename='<string>', logger=None,
     line : int
         start line of the docstring
     logger : Optional[logging.Logger]
+    default_format : Optional[str]
 
     Returns
     -------
     Tuple[OrderedDict[str, Arg], Optional[Arg]]
     """
-    if default_format == 'auto':
-        format_cls = guess_format(docstring)
+    if default_format is None:
+        # fall back to the global default (as set by set_default_format)
+        fmt = get_default_format()
+        if fmt is None:
+            format_cls = guess_format(docstring)
+        else:
+            format_cls = fmt
     else:
         format_cls = format_map[default_format]
     format = format_cls(line, filename=filename, logger=logger,
