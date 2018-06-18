@@ -206,7 +206,7 @@ class GoogleFormat(DocstringFormat):
         return self.parser(docstring)
 
 
-_default_format = None  # type: Optional[Type[DocstringFormat]]
+default_format = None  # type: Optional[Type[DocstringFormat]]
 formats = [NumpyFormat, GoogleFormat, RestFormat]  # type: List[Type[DocstringFormat]]
 format_map = {f.name: f for f in formats}  # type: Dict[str, Type[DocstringFormat]]
 
@@ -222,11 +222,11 @@ def set_default_format(format_name):
     -------
     Optional[Type[DocstringFormat]]
     """
-    global _default_format
+    global default_format
     if format_name is None:
-        _default_format = None
-    _default_format = format_map[format_name]
-    return _default_format
+        default_format = None
+    default_format = format_map[format_name]
+    return default_format
 
 
 def get_default_format():
@@ -236,11 +236,11 @@ def get_default_format():
     -------
     Optional[Type[DocstringFormat]]
     """
-    return _default_format
+    return default_format
 
 
 def guess_format(docstring):
-    # type: (str) -> Type[DocstringFormat]
+    # type: (str) -> Optional[Type[DocstringFormat]]
     """
     Convert the passed docstring to reStructuredText format.
 
@@ -251,17 +251,16 @@ def guess_format(docstring):
 
     Returns
     -------
-    Type[DocstringFormat]
+    Optional[Type[DocstringFormat]]
     """
     docstring = inspect.cleandoc(docstring)
     for format in formats:
         if format.matches(docstring):
             return format
-    return default_format
 
 
 def parse_docstring(docstring, line=0, filename='<string>', logger=None,
-                    default_format=None, options=None):
+                    format_name=None, options=None):
     # type: (str, int, Any, Optional[logging.Logger], Optional[str], Any) -> Tuple[OrderedDict[str, Arg], Optional[Arg]]
     """
     Parse the passed docstring.
@@ -274,21 +273,21 @@ def parse_docstring(docstring, line=0, filename='<string>', logger=None,
     line : int
         start line of the docstring
     logger : Optional[logging.Logger]
-    default_format : Optional[str]
+    format_name : Optional[str]
 
     Returns
     -------
     Tuple[OrderedDict[str, Arg], Optional[Arg]]
     """
-    if default_format is None:
+    if format_name is None:
         # fall back to the global default (as set by set_default_format)
-        fmt = get_default_format()
-        if fmt is None:
+        format_cls = get_default_format()
+        if format_cls is None:
             format_cls = guess_format(docstring)
-        else:
-            format_cls = fmt
+            if format_cls is None:
+                format_cls = RestFormat
     else:
-        format_cls = format_map[default_format]
+        format_cls = format_map[format_name]
     format = format_cls(line, filename=filename, logger=logger,
                         options=options)
     return format.parse(docstring)
