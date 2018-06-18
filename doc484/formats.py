@@ -4,11 +4,12 @@ import inspect
 import logging
 from collections import OrderedDict
 
-from typing import List, Tuple, Dict, Optional, TYPE_CHECKING, Type as Class
-
 from doc484.parsers import Arg
 from doc484.parsers.other import GoogleDocstring, NumpyDocstring
 from doc484.parsers.rest import RestDocstring
+
+if False:
+    from typing import *
 
 YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
 NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
@@ -28,6 +29,7 @@ def _setup_logger(log):
 
 
 def _cleandoc(docstring):
+    # type: (str) -> str
     return inspect.cleandoc(docstring).replace('`', '')
 
 
@@ -37,10 +39,11 @@ def compile(*regexs):
 
 
 class DocstringFormat(object):
-    name = ''
+    name = None  # type: str
     sections = None  # type: List[str]
 
     def __init__(self, line, filename='<string>', logger=None, options=None):
+        # type: (int, Any, Optional[logging.Logger], Any) -> None
         """
         Parameters
         ----------
@@ -54,6 +57,7 @@ class DocstringFormat(object):
         self.options = options or {}
 
     def warning(self, message, line):
+        # type: (str, int) -> None
         """
         Parameters
         ----------
@@ -68,6 +72,7 @@ class DocstringFormat(object):
         self.logger.warning(message, extra=extra)
 
     def error(self, message, line):
+        # type: (str, int) -> None
         """
         Parameters
         ----------
@@ -83,6 +88,7 @@ class DocstringFormat(object):
 
     @classmethod
     def matches(cls, docstring):
+        # type: (str) -> bool
         """
         Return whether `docstring` is compatible with this format.
 
@@ -97,27 +103,48 @@ class DocstringFormat(object):
         return any(s.search(docstring) for s in cls.sections)
 
     def _cast_pararms(self, params):
+        # type: (Optional[Iterable[Tuple[str, Arg]]]) -> OrderedDict[str, Arg]
+        """
+        Parameters
+        ----------
+        params : Optional[Iterable[Tuple[str, Arg]]]
+
+        Returns
+        -------
+        OrderedDict[str, Arg]
+        """
         if params is not None:
             return OrderedDict(params)
         else:
             return OrderedDict()
 
-    def _cast_returns(self, _returns):
-        if not _returns:
+    def _cast_returns(self, returns):
+        # type: (Optional[List[Arg]]) -> Arg
+        """
+        Parameters
+        ----------
+        returns : Optional[List[Arg]]
+
+        Returns
+        -------
+        Arg
+        """
+        if not returns:
             return None
-        elif len(_returns) == 1:
-            return _returns[0]
+        elif len(returns) == 1:
+            return returns[0]
         else:
             if self.options.get('allow_named_results', True):
-                return Arg('Tuple[%s]' % ', '.join([x.type for x in _returns]),
-                           _returns[0].line)
+                return Arg('Tuple[%s]' % ', '.join([x.type for x in returns]),
+                           returns[0].line)
             else:
-                self.warning(NAMED_ITEMS_ERROR, _returns[0].line)
+                self.warning(NAMED_ITEMS_ERROR, returns[0].line)
 
     def get_parser(self, docstring):
         raise NotImplementedError
 
     def parse(self, docstring):
+        # type: (str) -> Tuple[OrderedDict[str, Arg], Optional[Arg]]
         """
         Parameters
         ----------
@@ -176,11 +203,12 @@ class GoogleFormat(DocstringFormat):
 
 
 default_format = RestFormat
-formats = [NumpyFormat, GoogleFormat, default_format]  # type: List[DocstringFormat]
-format_map = {f.name: f for f in formats}  # type: Dict[str, DocstringFormat]
+formats = [NumpyFormat, GoogleFormat, default_format]  # type: List[Type[DocstringFormat]]
+format_map = {f.name: f for f in formats}  # type: Dict[str, Type[DocstringFormat]]
 
 
 def guess_format(docstring):
+    # type: (str) -> Type[DocstringFormat]
     """
     Convert the passed docstring to reStructuredText format.
 
@@ -191,7 +219,7 @@ def guess_format(docstring):
 
     Returns
     -------
-    Class[DocstringFormat]
+    Type[DocstringFormat]
     """
     docstring = inspect.cleandoc(docstring)
     for format in formats:
@@ -202,11 +230,14 @@ def guess_format(docstring):
 
 def parse_docstring(docstring, line=0, filename='<string>', logger=None,
                     default_format='auto', options=None):
+    # type: (str, int, Any, Optional[logging.Logger], Any, Any) -> Tuple[OrderedDict[str, Arg], Optional[Arg]]
     """
     Parameters
     ----------
     docstring : str
     line : int
+        start line of the docstring
+    logger : Optional[logging.Logger]
 
     Returns
     -------
