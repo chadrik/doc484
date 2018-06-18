@@ -12,15 +12,34 @@ from doc484.compat import PY3
 import doc484.formats
 
 if PY3:
-    from configparser import ConfigParser
+    from configparser import ConfigParser, NoSectionError
 else:
-    from ConfigParser import SafeConfigParser as ConfigParser
+    from ConfigParser import SafeConfigParser as ConfigParser, NoSectionError
 
+if False:
+    from typing import *
 
 fixer_pkg = 'doc484.fixes'
 
 
 def apply_config(keys, options, path=None):
+    # type: (, optparse.Values, Optional[str]) -> Dict[str, str]
+    """
+    Read setup.cfg from path or current working directory and apply it to the
+    parsed options
+
+    Parameters
+    ----------
+    keys
+    options : optparse.Values
+        parsed options
+    path : Optional[str]
+
+    Returns
+    -------
+    Dict[str, str]
+        default types by argument name
+    """
     if not path:
         path = os.getcwd()
 
@@ -43,6 +62,11 @@ def apply_config(keys, options, path=None):
 
     for key, typ, default in keys:
         addopt(key, typ, default)
+
+    try:
+        return dict(parser.items('doc484:default_arg_types'))
+    except NoSectionError:
+        return {}
 
 
 def _get_options_data(parser):
@@ -119,8 +143,10 @@ def main(args=None):
     # order of precedence: specified options > config options > parser defaults
     options, args = parser.parse_args(args, values=optparse.Values({}))
 
-    apply_config(_get_options_data(parser), options,
-                 path=getattr(options, 'config', None))
+    default_arg_types = apply_config(_get_options_data(parser), options,
+                                     path=getattr(options, 'config', None))
+
+    doc484.formats.default_arg_types.update(default_arg_types)
 
     if options.format:
         if options.verbose:

@@ -25,14 +25,17 @@ from lib2to3 import fixer_base
 from lib2to3.fixer_util import syms
 from lib2to3.pygram import python_grammar
 
-from ..formats import parse_docstring
+import doc484.formats as formats
+
+if False:
+    from typing import *
 
 number2symbol = python_grammar.number2symbol
 TYPE_REG = re.compile('\s*#\s*type:.*')
 
 
 def _get_type(typ, default='Any'):
-    return default if typ is None else typ.type
+    return default if typ is None else typ
 
 
 def is_type_comment(comment):
@@ -92,6 +95,15 @@ class FixTypeComments(fixer_base.BaseFix):
            ['->' any] ':' suite=any+ >
     """
 
+    def parse_docstring(self, docstring, line):
+        if docstring:
+            params, result = formats.parse_docstring(docstring, line=line,
+                                                     filename=self.filename)
+            return {k: v.type for k, v in params.items()}, \
+                   result.type if result else None
+        else:
+            return {}, None
+
     def transform(self, node, results):
         suite = results["suite"]
         args = results.get("args")
@@ -100,21 +112,21 @@ class FixTypeComments(fixer_base.BaseFix):
         name = str(name_node).strip()
         class_suite = find_classdef(name_node)
         is_method = class_suite is not None
-        # print name, is_method
 
         docstring, line, indent_node = get_docstring(suite)
-        if docstring is None and name == '__init__' and class_suite is not None:
-            docstring, line, _ = get_docstring(class_suite)
-        if docstring is None:
-            return
 
         comment = indent_node.prefix
         if comment.strip() == '# notype':
             return
 
+        if docstring is None and name == '__init__' and class_suite is not None:
+            # fall back to the class docstring
+            docstring, line, _ = get_docstring(class_suite)
+        if docstring is None and not formats.default_arg_types:
+            return
+
         types = []  # type: List[str]
-        params, result = parse_docstring(docstring, line=line,
-                                         filename=self.filename)
+        params, result = self.parse_docstring(docstring, line)
         if args:
             # if args.type == syms.tfpdef:
             #     pass
@@ -143,6 +155,8 @@ class FixTypeComments(fixer_base.BaseFix):
 
             for i, (arg, kind) in enumerate(zip(arg_list, kind_list)):
                 typ = params.get(arg.value)
+                if typ is None and formats.default_arg_types:
+                    typ = formats.default_arg_types.get(arg.value)
                 if not is_method or keep_arg(i, arg.value, typ):
                     types.append(kind + _get_type(typ).strip('*'))
 

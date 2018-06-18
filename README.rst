@@ -99,6 +99,20 @@ Usage
 Check the scripts directory for an example of how to automatically run
 ``doc484`` on modified files in your repository.
 
+You can override any of the command line options using an ini-style
+configuration file.  By default, ``doc484`` looks for a setup.cfg file in
+the current working directory, but you can also provide a config explicitly
+using the ``--config`` option.
+
+For example, to override the number of processes to use when converting, and
+specify the docstring format for the project, add this to your setup.cfg:
+
+.. code:: ini
+
+   [doc484]
+   processes = 12
+   format = numpy
+
 TODO
 ====
 - automatically insert ``typing`` imports

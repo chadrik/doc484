@@ -19,8 +19,12 @@ logging.basicConfig()
 
 _logger = logging.getLogger(__name__)
 
+# mapping of arg -> type annotation
+default_arg_types = {}  # type: Dict[str, str]
+
 
 def _setup_logger(log):
+    # type: (logging.Logger) -> None
     log.propagate = False
     hdlr = logging.StreamHandler()
     fmt = logging.Formatter('%(file)s: line %(line)s: %(message)s')
@@ -260,6 +264,10 @@ def parse_docstring(docstring, line=0, filename='<string>', logger=None,
                     default_format=None, options=None):
     # type: (str, int, Any, Optional[logging.Logger], Optional[str], Any) -> Tuple[OrderedDict[str, Arg], Optional[Arg]]
     """
+    Parse the passed docstring.
+
+    The OrderedDict holding parsed parameters may be sparse.
+
     Parameters
     ----------
     docstring : str
