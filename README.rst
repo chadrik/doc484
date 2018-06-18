@@ -7,9 +7,9 @@ Doc 484
 
 
 ``doc484`` provides a script to convert PEP484 docstrings to type comments, and can also be used as a normal python module.  It supports the three major docstring conventions:
-- `numpy <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html#example-numpy>`_
-- `google <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html>`_
-- `restructuredText <https://thomas-cokelaer.info/tutorials/sphinx/docstring_python.html#template-py-source-file>`_
+ `numpy <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html#example-numpy>`_,
+ `google <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html>`_, and
+ `restructuredText <https://thomas-cokelaer.info/tutorials/sphinx/docstring_python.html#template-py-source-file>`_
 
 Regardless of docstring convention you choose, the types declared within your docstrings should following the guidelines in `PEP 484 <https://www.python.org/dev/peps/pep-0484/>`_, especially use of the `typing <https://docs.python.org/3/library/typing.html>`_ module, where necessary.
 
