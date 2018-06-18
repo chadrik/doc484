@@ -7,8 +7,8 @@ Doc 484
    :target: https://travis-ci.org/chadrik/doc484
    :alt: CI Status
 
-PEP 484 type annotations from docstrings
-========================================
+Create PEP 484 type annotations from docstrings
+===============================================
 
 ``doc484`` provides a script to convert PEP484 docstrings to type comments, and can also be used as a normal python module.  It supports the three major docstring conventions `numpy <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html#example-numpy>`_, `google <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html>`_, and `restructuredText <https://thomas-cokelaer.info/tutorials/sphinx/docstring_python.html#template-py-source-file>`_
 
@@ -97,11 +97,11 @@ Usage
     doc484 -h
 
 Check the scripts directory for an example of how to automatically run
-`doc484` on modified files in your repository.
+``doc484`` on modified files in your repository.
 
 TODO
 ====
-- automatically insert `typing` imports
+- automatically insert ``typing`` imports
 - convert docstrings to function annotations (for python 3.5+)
 - add argument for docstring format (or read from setup.cfg)
-- convert `doctypes` to python?
+- convert ``doctypes`` to python?
