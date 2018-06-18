@@ -9,7 +9,8 @@ from docutils.readers.standalone import Reader as _Reader
 
 from doc484.parsers import Arg
 
-from typing import *
+if False:
+    from typing import *
 
 
 def _clean_type(s):

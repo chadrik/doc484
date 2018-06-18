@@ -33,15 +33,13 @@ from __future__ import absolute_import, print_function
 import collections
 import re
 
-from six import string_types
-from six.moves import range
-
+from doc484.compat import string_types, range
 from doc484.parsers import Arg
 
-from typing import *
+if False:
+    from typing import *
 
 SENTINEL = (None, None)
-
 
 _directive_regex = re.compile(r'\.\. \S+::')
 _google_section_regex = re.compile(r'^(\s|\w)+:\s*$')
