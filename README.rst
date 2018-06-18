@@ -3,6 +3,10 @@
 Doc 484
 =======
 
+.. image:: https://travis-ci.org/chadrik/doc484.svg?branch=master
+   :target: https://travis-ci.org/chadrik/doc484
+   :alt: CI Status
+
 PEP 484 type annotations from docstrings
 ========================================
 
