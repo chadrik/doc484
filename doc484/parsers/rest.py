@@ -67,7 +67,7 @@ class RestDocstring(object):
         yields = None
 
         try:
-            document = publish_doctree(self.docstring, self)
+            document = publish_doctree(self.docstring, self.logger)
         except SystemMessage:
             return params, returns, yields
 
