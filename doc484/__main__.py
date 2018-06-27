@@ -12,9 +12,9 @@ from doc484.compat import PY3
 import doc484.formats
 
 if PY3:
-    from configparser import ConfigParser, NoSectionError
+    from configparser import ConfigParser, NoSectionError, NoOptionError
 else:
-    from ConfigParser import SafeConfigParser as ConfigParser, NoSectionError
+    from ConfigParser import SafeConfigParser as ConfigParser, NoSectionError, NoOptionError
 
 if False:
     from typing import *
@@ -23,7 +23,7 @@ fixer_pkg = 'doc484.fixes'
 
 
 def apply_config(keys, options, path=None):
-    # type: (, optparse.Values, Optional[str]) -> Dict[str, str]
+    # type: (Any, optparse.Values, Optional[str]) -> Dict[str, str]
     """
     Read setup.cfg from path or current working directory and apply it to the
     parsed options
@@ -57,7 +57,10 @@ def apply_config(keys, options, path=None):
 
         method = getattr(parser, methname)
 
-        val = method('doc484', key, fallback=default)
+        try:
+            val = method('doc484', key)
+        except NoOptionError:
+            val = default
         setattr(options, key, val)
 
     for key, typ, default in keys:

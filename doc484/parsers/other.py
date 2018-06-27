@@ -354,7 +354,7 @@ class GoogleDocstring(object):
 
         before, colon, after = self._partition_field_on_colon(line, lineno)
         _name = before
-        _type = ''
+        _type = None
 
         if parse_type:
             match = _google_typed_arg_regex.match(before)
@@ -386,7 +386,7 @@ class GoogleDocstring(object):
         if lines:
             line, lineno = lines[0]
             before, colon, after = self._partition_field_on_colon(line, lineno)
-            _name, _type = '', ''
+            _type = None
 
             if colon:
                 match = _google_typed_arg_regex.match(before)
@@ -394,10 +394,10 @@ class GoogleDocstring(object):
                     _type = match.group(2)
                 else:
                     _type = before
+            if _type:
+                return [Arg(_type, lineno)]
 
-            return [Arg(_type, lineno)]
-        else:
-            return []
+        return []
 
     def _consume_section_header(self):
         section, _ = next(self._line_iter)
@@ -563,7 +563,7 @@ class NumpyDocstring(GoogleDocstring):
             _name, _, _type = self._partition_field_on_colon(line, lineno)
         else:
             _name = line
-            _type = ''
+            _type = None
 
         _name, _type = _name.strip(), _type.strip()
         _name = self._escape_args_and_kwargs(_name)

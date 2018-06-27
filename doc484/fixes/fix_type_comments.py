@@ -102,7 +102,7 @@ class FixTypeComments(fixer_base.BaseFix):
         if docstring:
             params, result = formats.parse_docstring(docstring, line=line,
                                                      filename=self.filename)
-            return {k: v.type for k, v in params.items()}, \
+            return {k: v.type for k, v in params.items() if v.type}, \
                    result.type if result else None
         else:
             return {}, None
@@ -136,6 +136,7 @@ class FixTypeComments(fixer_base.BaseFix):
 
         types = []  # type: List[str]
         params, result = self.parse_docstring(docstring, line)
+
         if args:
             # if args.type == syms.tfpdef:
             #     pass

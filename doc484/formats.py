@@ -160,10 +160,10 @@ class DocstringFormat(object):
         Tuple[OrderedDict[str, Arg], Optional[Arg]]
         """
         p = self.get_parser(_cleandoc(docstring))
-        params, _returns, _yields = p.parse()
-        if _yields:
-            self.warning(YIELDS_ERROR, _yields[0].line)
-        return self._cast_pararms(params), self._cast_returns(_returns)
+        params, returns, yields = p.parse()
+        if yields:
+            self.warning(YIELDS_ERROR, yields[0].line)
+        return self._cast_pararms(params), self._cast_returns(returns)
 
 
 class RestFormat(DocstringFormat):

@@ -52,6 +52,49 @@ def foo(one, two, three):
     assert output == expected
 
 
+def test_omit_type():
+    input = '''\
+"""
+Module-level docs
+"""
+
+def foo(one, two, three):
+    """
+    Parameters
+    ----------
+    one
+    two : str
+
+    Return
+    ------
+    bool
+    """
+    pass
+'''
+    output = convert_string(input)
+
+    expected = '''\
+"""
+Module-level docs
+"""
+
+def foo(one, two, three):
+    # type: (Any, str, Any) -> bool
+    """
+    Parameters
+    ----------
+    one
+    two : str
+
+    Return
+    ------
+    bool
+    """
+    pass
+'''
+    assert output == expected
+
+
 def test_star_args():
     # Not necessary for mypy but useful for PyCharm
 
