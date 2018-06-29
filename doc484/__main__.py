@@ -59,7 +59,7 @@ def apply_config(keys, options, path=None):
 
         try:
             val = method('doc484', key)
-        except NoOptionError:
+        except (NoSectionError, NoOptionError):
             val = default
         setattr(options, key, val)
 
