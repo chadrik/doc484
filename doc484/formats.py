@@ -11,8 +11,10 @@ from doc484.parsers.rest import RestDocstring
 if False:
     from typing import *
 
-YIELDS_ERROR = "'Yields' is not supported. Use 'Returns' with Iterator[]"
-NAMED_ITEMS_ERROR = 'Named results are not supported. Use Tuple[] or NamedTuple'
+YIELDS_ERROR = "'Yields' is not allowed. Use 'Returns' with Iterator[], " \
+               "or enable allow_yields"
+NAMED_ITEMS_ERROR = 'Named results are not allowed. Use Tuple[] or ' \
+                    'NamedTuple, or enable allow_named_results'
 NAMED_RESULTS_REG = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*\s+\(([^)]+)\)')
 
 logging.basicConfig()
@@ -124,7 +126,7 @@ class DocstringFormat(object):
             return OrderedDict()
 
     def _cast_returns(self, returns):
-        # type: (Optional[List[Arg]]) -> Arg
+        # type: (Optional[List[Arg]]) -> Optional[Arg]
         """
         Parameters
         ----------
@@ -132,7 +134,7 @@ class DocstringFormat(object):
 
         Returns
         -------
-        Arg
+        Optional[Arg]
         """
         if not returns:
             return None
@@ -144,6 +146,27 @@ class DocstringFormat(object):
                            returns[0].line)
             else:
                 self.warning(NAMED_ITEMS_ERROR, returns[0].line)
+
+    def _cast_yields(self, yields):
+        # type: (Optional[List[Arg]]) -> Optional[Arg]
+        """
+        Parameters
+        ----------
+        yields : Optional[List[Arg]]
+
+        Returns
+        -------
+        Optional[Arg]
+        """
+        if not yields:
+            return None
+
+        if self.options.get('allow_yields', True):
+            result = self._cast_returns(yields)
+            if result:
+                return Arg('Iterator[%s]' % result.type, result.line)
+        else:
+            self.warning(YIELDS_ERROR, yields[0].line)
 
     def get_parser(self, docstring):
         raise NotImplementedError
@@ -161,9 +184,16 @@ class DocstringFormat(object):
         """
         p = self.get_parser(_cleandoc(docstring))
         params, returns, yields = p.parse()
+        if returns and yields:
+            self.warning("types found for both return and yield",
+                         returns[0].line)
         if yields:
-            self.warning(YIELDS_ERROR, yields[0].line)
-        return self._cast_pararms(params), self._cast_returns(returns)
+            result = self._cast_yields(yields)
+        elif returns:
+            result = self._cast_returns(returns)
+        else:
+            result = None
+        return self._cast_pararms(params), result
 
 
 class RestFormat(DocstringFormat):
