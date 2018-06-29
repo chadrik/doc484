@@ -11,43 +11,57 @@ def convert_string(input):
 
 def test_basic():
     input = '''\
-"""
-Module-level docs
-"""
-
-def foo(one, two, three):
+def basic(one, two, three, four, five, six):
     """
     Parameters
     ----------
     one : Union[str, int]
+        description of one
     two : str
-    
+        description of two
+        that spans multiple lines
+
+    four
+        omitted type
+    five : bool
+        description
+        with
+
+        a line break
+    six : int
+
     Return
     ------
     bool
     """
-    pass
 '''
     output = convert_string(input)
 
     expected = '''\
-"""
-Module-level docs
-"""
-
-def foo(one, two, three):
-    # type: (Union[str, int], str, Any) -> bool
+def basic(one, two, three, four, five, six):
+    # type: (Union[str, int], str, Any, Any, bool, int) -> bool
     """
     Parameters
     ----------
     one : Union[str, int]
+        description of one
     two : str
-    
+        description of two
+        that spans multiple lines
+
+    four
+        omitted type
+    five : bool
+        description
+        with
+
+        a line break
+    six : int
+
     Return
     ------
     bool
     """
-    pass
 '''
     assert output == expected
 

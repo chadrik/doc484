@@ -592,7 +592,7 @@ class NumpyDocstring(GoogleDocstring):
                 self._is_section_header() or
                 ['', ''] == [line1[0], line2[0]] or
                 (self._is_in_section and
-                    line1 and
+                    line1[0] and
                     not self._is_indented(line1[0], self._section_indent)))
 
     def _is_section_header(self):
