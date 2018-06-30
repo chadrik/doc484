@@ -14,7 +14,8 @@ import doc484.formats
 if PY3:
     from configparser import ConfigParser, NoSectionError, NoOptionError
 else:
-    from ConfigParser import SafeConfigParser as ConfigParser, NoSectionError, NoOptionError
+    from ConfigParser import SafeConfigParser as ConfigParser, NoSectionError,\
+        NoOptionError
 
 if False:
     from typing import *
@@ -102,7 +103,8 @@ def main(args=None):
                       default=False, help="Fix up doctests only")
     parser.add_option("-f", "--format",
                       choices=list(doc484.formats.format_map.keys()),
-                      help="Docstring convention (by default this is "
+                      help="Docstring convention used by the files to be "
+                      "converted (by default this is "
                       "automatically determined by inspecting each docstring "
                       "but it is faster and more reliable to specify this "
                       "explicitly)")
@@ -123,12 +125,10 @@ def main(args=None):
                       help="Modify the grammar so that print() is a function")
     parser.add_option("-v", "--verbose", action="store_true", default=False,
                       help="More verbose logging")
-    parser.add_option("--no-diffs", action="store_true", default=False,
-                      help="Don't show diffs of the refactoring")
+    # parser.add_option("--show-diffs", action="store_true", default=False,
+    #                   help="Show diffs of the refactoring")
     parser.add_option("-w", "--write", action="store_true", default=False,
                       help="Write back modified files")
-    parser.add_option("-n", "--nobackups", action="store_true", default=False,
-                      help="Don't write backups for modified files")
     parser.add_option("-c", "--config", action="store", type="str",
                       default=None, help="Read settings from the specified "
                       "ini-style configuration file (defaults to `./setup.cfg'")
@@ -142,7 +142,7 @@ def main(args=None):
     parser.add_option("--add-suffix", action="store", type="str", default="",
                       help="Append this string to all output filenames."
                       " Requires -n if non-empty.  "
-                      "ex: --add-suffix='3' will generate .py3 files.")
+                      "ex: --add-suffix='i' will generate .pyi files.")
 
     # Parse command line arguments
     refactor_stdin = False
@@ -161,7 +161,7 @@ def main(args=None):
 
     if options.format:
         if options.verbose:
-            print("Using %r format" % options.format)
+            print("Using %r format" % options.format, file=sys.stderr)
         doc484.formats.set_default_format(options.format)
 
     if options.write_unchanged_files:
@@ -169,18 +169,9 @@ def main(args=None):
         if not options.write:
             warn("--write-unchanged-files/-W implies -w.")
         options.write = True
-    # If we allowed these, the original files would be renamed to backup names
-    # but not replaced.
-    if options.output_dir and not options.nobackups:
-        parser.error("Can't use --output-dir/-o without -n.")
-    if options.add_suffix and not options.nobackups:
-        parser.error("Can't use --add-suffix without -n.")
 
-    if not options.write and options.no_diffs:
-        warn("not writing files and not printing diffs; that's not "
-             "very useful")
-    if not options.write and options.nobackups:
-        parser.error("Can't use -n without -w")
+    show_diffs = not options.write
+
     # if options.list_fixes:
     #     print("Available transformations for the -f/--fix option:")
     #     for fixname in refactor.get_all_fix_names(fixer_pkg):
@@ -226,7 +217,7 @@ def main(args=None):
 
     input_base_dir = os.path.commonprefix(args)
     if (input_base_dir and not input_base_dir.endswith(os.sep)
-        and not os.path.isdir(input_base_dir)):
+            and not os.path.isdir(input_base_dir)):
         # One or more similar names were passed, their directory is the base.
         # os.path.commonprefix() is ignorant of path elements, this corrects
         # for that weird API.
@@ -237,7 +228,7 @@ def main(args=None):
                     options.output_dir, input_base_dir)
     rt = StdoutRefactoringTool(
             sorted(fixer_names), flags, sorted(explicit),
-            options.nobackups, not options.no_diffs,
+            nobackups=True, show_diffs=show_diffs,
             input_base_dir=input_base_dir,
             output_dir=options.output_dir,
             append_suffix=options.add_suffix)

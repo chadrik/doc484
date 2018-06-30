@@ -52,7 +52,7 @@ function doctypes() {
         paths="$@"
     fi
     echo "Converting docstrings to type comments"
-    python -m doc484 --write --nobackups --no-diffs --processes=$procs $paths
+    python -m doc484 --write --processes=$procs $paths
 }
 
 doctypes "$@"
