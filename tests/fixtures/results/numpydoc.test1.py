@@ -5,7 +5,7 @@ Module-level docs
 from __future__ import absolute_import, print_function
 
 
-def basic(one, two, three, four, five, six):
+def basic(one, two, three, four, _five, six_):
     # type: (Union[str, int], str, Any, Any, bool, int) -> bool
     """
     Parameters
@@ -17,16 +17,17 @@ def basic(one, two, three, four, five, six):
         that spans multiple lines
     four
         omitted type
-    five : bool
+    _five : bool
         description
         with
 
         a line break
-    six : int
+    six_ : int
 
-    Return
-    ------
+    Returns
+    -------
     bool
+        True if successful, False otherwise
     """
 
 
@@ -38,8 +39,8 @@ def star_args(one, *two, **three):
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -52,8 +53,8 @@ def star_args2(one, *two, **three):
     one : Union[str, int]
     two : *str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -68,8 +69,8 @@ def skiptype(one, two, three):
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -94,8 +95,8 @@ def existing_type_comment(one, two, three):
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -109,8 +110,8 @@ def existing_comment(one, two, three):
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -118,7 +119,8 @@ def existing_comment(one, two, three):
 def default_return_type(one):
     # type: (str) -> Any
     """
-    Description of foo
+    When no return type is specified, the default type can be globally
+    configured.
 
     Parameters
     ----------
@@ -139,13 +141,13 @@ def returns_tuple():
         description of two
         that spans multiple lines
     four
-        omitted colon defaults to type
-    five : bool
+        omitted type
+    _five : bool
         description
         with
 
         a line break
-    six : int
+    six_ : int
     """
 
 
@@ -171,13 +173,13 @@ def yields_tuple():
         description of two
         that spans multiple lines
     four
-        omitted colon defaults to type
-    five : bool
+        omitted type
+    _five : bool
         description
         with
 
         a line break
-    six : int
+    six_ : int
     """
 
 
@@ -190,8 +192,8 @@ class BasicClass:
         one : Union[str, int]
         two : str
 
-        Return
-        ------
+        Returns
+        -------
         bool
         """
 
@@ -206,8 +208,8 @@ def function_self(self, one, two, three):
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 

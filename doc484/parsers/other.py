@@ -322,7 +322,7 @@ class GoogleDocstring(object):
         }
 
     def _consume_indented_block(self, indent=1):
-        # type: () -> List[Tuple[str, int]]
+        # type: (int) -> List[Tuple[str, int]]
         lines = []  # type: List[Tuple[str, int]]
         line = self._line_iter.peek()
         while(not self._is_section_break() and
@@ -366,7 +366,7 @@ class GoogleDocstring(object):
 
         if prefer_type and not _type:
             _type, _name = _name, _type
-        indent = self._get_indent(line[0]) + 1
+        indent = self._get_indent(line) + 1
         self._consume_indented_block(indent)
         return _name, _type, lineno
 
@@ -438,15 +438,17 @@ class GoogleDocstring(object):
             return name
 
     def _get_current_indent(self, peek_ahead=0):
+        # type: (int) -> int
         line = self._line_iter.peek(peek_ahead + 1)[peek_ahead]
         while line != self._line_iter.sentinel:
-            if line:
-                return self._get_indent(line)
+            if line[0]:
+                return self._get_indent(line[0])
             peek_ahead += 1
             line = self._line_iter.peek(peek_ahead + 1)[peek_ahead]
         return 0
 
     def _get_indent(self, line):
+        # type: (str) -> int
         for i, s in enumerate(line):
             if not s.isspace():
                 return i
@@ -465,6 +467,7 @@ class GoogleDocstring(object):
         return min_indent or 0
 
     def _is_indented(self, line, indent=1):
+        # type: (str, int) -> bool
         for i, s in enumerate(line):
             if i >= indent:
                 return True
@@ -473,7 +476,7 @@ class GoogleDocstring(object):
         return False
 
     def _is_section_header(self):
-        section = self._line_iter.peek().lower()
+        section = self._line_iter.peek()[0].lower()
         match = _google_section_regex.match(section)
         if match and section.strip(':') in self._sections:
             header_indent = self._get_indent(section)
@@ -487,12 +490,12 @@ class GoogleDocstring(object):
         return False
 
     def _is_section_break(self):
-        line = self._line_iter.peek()
+        line, _ = self._line_iter.peek()
         return (not self._line_iter.has_next() or
                 self._is_section_header() or
                 (self._is_in_section and
                     line and
-                    not self._is_indented(line[0], self._section_indent)))
+                    not self._is_indented(line, self._section_indent)))
 
     def parse(self):
         self._consume_empty()
@@ -532,6 +535,7 @@ class GoogleDocstring(object):
         self._yields = self._consume_returns_section()
 
     def _partition_field_on_colon(self, line, lineno):
+        # type: (str, int) -> Tuple[str, str, str]
         before_colon = []
         after_colon = []
         colon = ''

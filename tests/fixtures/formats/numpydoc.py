@@ -5,8 +5,7 @@ Module-level docs
 from __future__ import absolute_import, print_function
 
 
-def basic(one, two, three, four, five, six):
-    # type: (Union[str, int], str, Any, Any, bool, int) -> bool
+def basic(one, two, three, four, _five, six_):
     """
     Parameters
     ----------
@@ -17,43 +16,42 @@ def basic(one, two, three, four, five, six):
         that spans multiple lines
     four
         omitted type
-    five : bool
+    _five : bool
         description
         with
 
         a line break
-    six : int
+    six_ : int
 
-    Return
-    ------
+    Returns
+    -------
     bool
+        True if successful, False otherwise
     """
 
 
 def star_args(one, *two, **three):
-    # type: (Union[str, int], *str, **Any) -> bool
     """
     Parameters
     ----------
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
 
 def star_args2(one, *two, **three):
-    # type: (Union[str, int], *str, **Any) -> bool
     """
     Parameters
     ----------
     one : Union[str, int]
     two : *str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -68,8 +66,8 @@ def skiptype(one, two, three):
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -85,7 +83,7 @@ def no_docs(one, *two, **three):
 
 
 def existing_type_comment(one, two, three):
-    # type: (Union[str, int], str, Any) -> bool
+    # type: (Union[str, int], Any, Any) -> bool
     """
     Existing type comments should be overwritten
 
@@ -94,8 +92,8 @@ def existing_type_comment(one, two, three):
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -108,8 +106,8 @@ def existing_comment(one, two, three):
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -117,7 +115,8 @@ def existing_comment(one, two, three):
 def default_return_type(one):
     # type: (str) -> None
     """
-    Description of foo
+    When no return type is specified, the default type can be globally
+    configured.
 
     Parameters
     ----------
@@ -137,13 +136,13 @@ def returns_tuple():
         description of two
         that spans multiple lines
     four
-        omitted colon defaults to type
-    five : bool
+        omitted type
+    _five : bool
         description
         with
 
         a line break
-    six : int
+    six_ : int
     """
 
 
@@ -167,33 +166,31 @@ def yields_tuple():
         description of two
         that spans multiple lines
     four
-        omitted colon defaults to type
-    five : bool
+        omitted type
+    _five : bool
         description
         with
 
         a line break
-    six : int
+    six_ : int
     """
 
 
 class BasicClass:
     def foo(self, one, two, three):
-        # type: (Union[str, int], str, Any) -> bool
         """
         Parameters
         ----------
         one : Union[str, int]
         two : str
 
-        Return
-        ------
+        Returns
+        -------
         bool
         """
 
 
 def function_self(self, one, two, three):
-    # type: (Any, Union[str, int], str, Any) -> bool
     """
     A function with a first argument named self should document self
 
@@ -202,8 +199,8 @@ def function_self(self, one, two, three):
     one : Union[str, int]
     two : str
 
-    Return
-    ------
+    Returns
+    -------
     bool
     """
 
@@ -218,5 +215,4 @@ class InitDocsAtClassLevel:
     two : str
     """
     def __init__(self, one, two, three):
-        # type: (Union[str, int], str, Any) -> None
         pass

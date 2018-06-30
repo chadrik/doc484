@@ -12,7 +12,7 @@ def convert_string(input):
 
 
 @pytest.mark.parametrize("config", ['test1', 'test2'])
-@pytest.mark.parametrize("format", ['numpydoc'])
+@pytest.mark.parametrize("format", ['numpydoc', 'googledoc'])
 def test_cli(format, config, pytestconfig, tmpdir):
     fixturedir = pytestconfig.rootdir.join('tests', 'fixtures')
 
@@ -23,7 +23,9 @@ def test_cli(format, config, pytestconfig, tmpdir):
     configdir.chdir()
     dest = tmpdir.join((format + '.py'))
 
-    main(["--write", "--output-dir", str(tmpdir), str(source)])
+    errors = main(["--write", "--output-dir", str(tmpdir), str(source)])
+
+    assert errors == []
 
     with dest.open() as f:
         destlines = f.read()

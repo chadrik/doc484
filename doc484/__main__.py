@@ -248,9 +248,10 @@ def main(args=None):
                 return 1
         rt.summarize()
 
-    # Return error status (0 if rt.errors is zero)
-    return int(bool(rt.errors))
+    return rt.errors
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    errors = main()
+    # Return error status (0 if rt.errors is zero)
+    sys.exit(int(bool(errors)))
