@@ -12,7 +12,7 @@ def convert_string(input):
 
 
 @pytest.mark.parametrize("config", ['test1', 'test2'])
-@pytest.mark.parametrize("format", ['numpydoc', 'googledoc'])
+@pytest.mark.parametrize("format", ['numpydoc', 'googledoc', 'restdoc'])
 def test_cli(format, config, pytestconfig, tmpdir):
     fixturedir = pytestconfig.rootdir.join('tests', 'fixtures')
 
