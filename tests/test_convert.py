@@ -1,5 +1,6 @@
 from __future__ import absolute_import, print_function
 
+import logging
 import pytest
 from lib2to3.refactor import RefactoringTool, get_fixers_from_package
 from doc484.__main__ import main
@@ -13,7 +14,7 @@ def convert_string(input):
 
 @pytest.mark.parametrize("config", ['test1', 'test2'])
 @pytest.mark.parametrize("format", ['numpydoc', 'googledoc', 'restdoc'])
-def test_cli(format, config, pytestconfig, tmpdir):
+def test_cli(format, config, pytestconfig, tmpdir, caplog):
     fixturedir = pytestconfig.rootdir.join('tests', 'fixtures')
 
     configdir = fixturedir.join('configs', config)
@@ -23,7 +24,14 @@ def test_cli(format, config, pytestconfig, tmpdir):
     configdir.chdir()
     dest = tmpdir.join((format + '.py'))
 
+    # pytest calls basicConfig before main() gets a chance to.
+    # by calling basicConfig, main sets up the root logger and loglevel for
+    # all of lib2to3: it defaults to INFO, but --verbose sets it to DEBUG.
+    caplog.set_level(logging.INFO)
     errors = main(["--write", "--output-dir", str(tmpdir), str(source)])
+
+    records = [x[2] for x in caplog.record_tuples if x[0] == 'doc484.formats']
+    assert records == []
 
     assert errors == []
 

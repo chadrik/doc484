@@ -17,22 +17,29 @@ NAMED_ITEMS_ERROR = 'Named results are not allowed. Use Tuple[] or ' \
                     'NamedTuple, or enable allow_named_results'
 NAMED_RESULTS_REG = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*\s+\(([^)]+)\)')
 
-logging.basicConfig()
+# logging.basicConfig()
 
-_logger = logging.getLogger(__name__)
+_logger = None
 
 # mapping of arg -> type annotation
 default_arg_types = {}  # type: Dict[str, str]
 default_return_type = 'Any'
 
 
-def _setup_logger(log):
-    # type: (logging.Logger) -> None
-    log.propagate = False
-    hdlr = logging.StreamHandler()
-    fmt = logging.Formatter('%(file)s: line %(line)s: %(message)s')
-    hdlr.setFormatter(fmt)
-    log.addHandler(hdlr)
+class FormatLoggingAdapter(logging.LoggerAdapter):
+    def process(self, msg, kwargs):
+        line = self.extra['line'] + kwargs['extra']['line']
+        return u'%s: line %s: %s' % (self.extra['file'], line, msg), kwargs
+
+
+def get_deafult_logger():
+    # let's us defer creation of the logger until basicConfig is called by
+    # main()
+    global _logger
+    # FIXME: conditionally run basicConfig?
+    if _logger is None:
+        _logger = logging.getLogger(__name__)
+    return _logger
 
 
 def _cleandoc(docstring):
@@ -58,7 +65,15 @@ class DocstringFormat(object):
             start line of the docstring
         logger : Optional[logging.Logger]
         """
-        self.logger = logger or _logger
+        assert logger is None
+        self.logger = FormatLoggingAdapter(
+            logger or get_deafult_logger(),
+            extra={
+                'file': filename,
+                'line': line,
+                'column': 0
+            }
+        )
         self.line = line
         self.filename = filename
         self.options = options or {}
@@ -72,9 +87,7 @@ class DocstringFormat(object):
         line : int
         """
         extra = {
-            'file': self.filename,
-            'line': line + self.line,
-            'column': 0
+            'line': line,
         }
         self.logger.warning(message, extra=extra)
 
@@ -87,9 +100,7 @@ class DocstringFormat(object):
         line : int
         """
         extra = {
-            'file': self.filename,
-            'line': line + self.line,
-            'column': 0
+            'line': line,
         }
         self.logger.error(message, extra=extra)
 
@@ -205,10 +216,10 @@ class RestFormat(DocstringFormat):
         r'(\n|^):Yields:'
     )
 
-    parser = RestDocstring
+    parser_class = RestDocstring
 
     def get_parser(self, docstring):
-        return self.parser(docstring, self)
+        return self.parser_class(docstring, self)
 
 
 class NumpyFormat(DocstringFormat):
@@ -218,10 +229,10 @@ class NumpyFormat(DocstringFormat):
         r'(\n|^)Returns\n-------\n',
         r'(\n|^)Yields\n------\n'
     )
-    parser = NumpyDocstring
+    parser_class = NumpyDocstring
 
     def get_parser(self, docstring):
-        return self.parser(docstring)
+        return self.parser_class(docstring)
 
 
 class GoogleFormat(DocstringFormat):
@@ -231,10 +242,10 @@ class GoogleFormat(DocstringFormat):
         r'(\n|^)Returns:\n',
         r'(\n|^)Yields:\n'
     )
-    parser = GoogleDocstring
+    parser_class = GoogleDocstring
 
     def get_parser(self, docstring):
-        return self.parser(docstring)
+        return self.parser_class(docstring)
 
 
 default_format = None  # type: Optional[Type[DocstringFormat]]
@@ -322,6 +333,3 @@ def parse_docstring(docstring, line=0, filename='<string>', logger=None,
     format = format_cls(line, filename=filename, logger=logger,
                         options=options)
     return format.parse(docstring)
-
-
-_setup_logger(_logger)

@@ -159,9 +159,13 @@ def main(args=None):
     doc484.formats.default_arg_types.update(default_arg_types)
     doc484.formats.default_return_type = options.default_return_type
 
+    # Set up logging handler
+    level = logging.DEBUG if options.verbose else logging.INFO
+    logging.basicConfig(format='%(message)s', level=level)
+    logger = logging.getLogger('doc484.main')
+
     if options.format:
-        if options.verbose:
-            print("Using %r format" % options.format, file=sys.stderr)
+        logger.info("Using %r format" % options.format)
         doc484.formats.set_default_format(options.format)
 
     if options.write_unchanged_files:
@@ -190,11 +194,6 @@ def main(args=None):
             return 2
     if options.print_function:
         flags["print_function"] = True
-
-    # Set up logging handler
-    level = logging.DEBUG if options.verbose else logging.INFO
-    logging.basicConfig(format='%(name)s: %(message)s', level=level)
-    logger = logging.getLogger('lib2to3.main')
 
     # NOTE: removing this until we have more fixes
     # Initialize the refactoring tool

@@ -8,6 +8,10 @@ from __future__ import absolute_import, print_function
 def basic(one, two, three, four, _five, six_):
     # type: (Union[str, int], str, Any, Any, bool, int) -> bool
     """
+    Note that we escape before \six_ because underscore is a markdown
+    character.  This is strictly to avoid warnings: the generated type comment
+    will be correct with or without escaping.
+
     :param one: description of one
     :type one: Union[str, int]
     :param two: description of two
@@ -19,7 +23,7 @@ def basic(one, two, three, four, _five, six_):
 
         a line break
     :type _five: bool
-    :type six_: int
+    :type \six_: int
 
     :rtype: bool
     :return: True if successful, False otherwise
@@ -39,8 +43,12 @@ def star_args(one, *two, **three):
 def star_args2(one, *two, **three):
     # type: (Union[str, int], *str, **Any) -> bool
     """
+    Note that we escape before \* because it is a markdown character.  This is
+    strictly to avoid warnings: the generated type comment will be correct
+    with or without escaping.
+
     :type one: Union[str, int]
-    :type two: *str
+    :type two: \*str
 
     :rtype: bool
     """
