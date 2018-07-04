@@ -31,6 +31,7 @@ class FormatLoggingAdapter(logging.LoggerAdapter):
 
 
 def get_deafult_logger():
+    # type: () -> logging.Logger
     # let's us defer creation of the logger until basicConfig is called by
     # main()
     global _logger
@@ -46,13 +47,13 @@ def _cleandoc(docstring):
 
 
 def compile(*regexs):
-    # type: (str) -> List[re.Pattern]
+    # type: (str) -> List[Pattern]
     return [re.compile(s) for s in regexs]
 
 
 class DocstringFormat(object):
     name = None  # type: str
-    sections = None  # type: List[str]
+    sections = None  # type: List[Pattern]
 
     def __init__(self, line, filename='<string>', logger=None, options=None):
         # type: (int, Any, Optional[logging.Logger], Any) -> None
@@ -151,7 +152,8 @@ class DocstringFormat(object):
             return returns[0]
         else:
             if self.options.get('allow_named_results', True):
-                return Arg('Tuple[%s]' % ', '.join([x.type for x in returns]),
+                return Arg('Tuple[%s]' % ', '.join([x.type for x in returns
+                                                    if x.type is not None]),
                            returns[0].line)
             else:
                 self.warning(NAMED_ITEMS_ERROR, returns[0].line)
@@ -177,7 +179,26 @@ class DocstringFormat(object):
         else:
             self.warning(YIELDS_ERROR, yields[0].line)
 
-    def get_parser(self, docstring):
+    def _parse(self, docstring):
+        # type: (str) -> Tuple[Optional[List[Tuple[str, Arg]]], Optional[List[Arg]], Optional[List[Arg]]]
+        """
+        Low-level parsing
+
+        Parameters
+        ----------
+        docstring : str
+
+        Returns
+        -------
+        params : Optional[List[Tuple[str, Arg]]]
+            list of parsed parameters
+        returns : Optional[List[Arg]]
+            list of parsed return fields (list is greater than one if
+            return value was documented as a tuple)
+        yields : Optional[List[Arg]]
+            list of parsed yield fields (list is greater than one if
+            return value was documented as a tuple)
+        """
         raise NotImplementedError
 
     def parse(self, docstring):
@@ -189,10 +210,10 @@ class DocstringFormat(object):
 
         Returns
         -------
-        Tuple[OrderedDict[str, Arg], Optional[Arg]]
+        params : OrderedDict[str, Arg]
+        result : Optional[Arg]
         """
-        p = self.get_parser(_cleandoc(docstring))
-        params, returns, yields = p.parse()
+        params, returns, yields = self._parse(_cleandoc(docstring))
         if returns and yields:
             self.warning("types found for both return and yield",
                          returns[0].line)
@@ -216,8 +237,8 @@ class RestFormat(DocstringFormat):
 
     parser_class = RestDocstring
 
-    def get_parser(self, docstring):
-        return self.parser_class(docstring, self)
+    def _parse(self, docstring):
+        return self.parser_class(docstring, self).parse()
 
 
 class NumpyFormat(DocstringFormat):
@@ -229,8 +250,8 @@ class NumpyFormat(DocstringFormat):
     )
     parser_class = NumpyDocstring
 
-    def get_parser(self, docstring):
-        return self.parser_class(docstring)
+    def _parse(self, docstring):
+        return self.parser_class(docstring).parse()
 
 
 class GoogleFormat(DocstringFormat):
@@ -242,8 +263,8 @@ class GoogleFormat(DocstringFormat):
     )
     parser_class = GoogleDocstring
 
-    def get_parser(self, docstring):
-        return self.parser_class(docstring)
+    def _parse(self, docstring):
+        return self.parser_class(docstring).parse()
 
 
 default_format = None  # type: Optional[Type[DocstringFormat]]
@@ -264,8 +285,10 @@ def set_default_format(format_name):
     """
     global default_format
     if format_name is None:
+        # unset default
         default_format = None
-    default_format = format_map[format_name]
+    else:
+        default_format = format_map[format_name]
     return default_format
 
 

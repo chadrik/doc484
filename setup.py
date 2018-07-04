@@ -20,9 +20,7 @@ setup(
         'console_scripts': ['doc484=doc484.__main__:main'],
     },
     install_requires=[
-        "typing",
-        "docutils",
-        "six",
+        "docutils",  # only required for rest format
     ],
     extras_require={
         "tests": [

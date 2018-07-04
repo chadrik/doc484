@@ -36,8 +36,23 @@ import re
 from doc484.compat import string_types, range
 from doc484.parsers import Arg
 
-if False:
+TYPE_CHECKING = False
+if TYPE_CHECKING:
     from typing import *
+    T = TypeVar('T')
+else:
+    # alternative to typing.Generic to accelerate isinstance / issubclass.
+    # the trade-off is loss of dynamic inspection of generics (meh).
+    class FakeGenericMeta(type):
+        def __getitem__(self, params):
+            return self
+
+    class Generic(object):
+        __metaclass__ = FakeGenericMeta
+        __slots__ = ()
+    T = object()
+    overload = lambda f: f
+
 
 SENTINEL = (None, None)
 
@@ -53,12 +68,12 @@ _enumerated_list_regex = re.compile(
     r'(?(paren)\)|\.)(\s+\S|\s*$)')
 
 
-class peek_iter(object):
+class peek_iter(Generic[T]):
     """An iterator object that supports peeking ahead.
 
     Parameters
     ----------
-    o : iterable or callable
+    obj : Iterable[T]
         `o` is interpreted very differently depending on the presence of
         `sentinel`.
 
@@ -67,7 +82,7 @@ class peek_iter(object):
 
         If `sentinel` is given, then `o` must be a callable object.
 
-    sentinel : any value, optional
+    sentinel : Optional[Any]
         If given, the iterator will call `o` with no arguments for each
         call to its `next` method; if the value returned is equal to
         `sentinel`, :exc:`StopIteration` will be raised, otherwise the
@@ -87,18 +102,30 @@ class peek_iter(object):
 
     """
     def __init__(self, obj, sentitnel=None):
-        """__init__(o, sentinel=None)"""
+        # type: (Iterable[T], Any) -> None
         self._iterable = iter(obj)
-        self._cache = collections.deque()
+        self._cache = collections.deque()  # type: Deque[T]
         if sentitnel is not None:
             self.sentinel = sentitnel
         else:
             self.sentinel = object()
 
     def __iter__(self):
+        # type: () -> Iterator[T]
         return self
 
+    @overload
+    def __next__(self):
+        # type: () -> T
+        pass
+
+    @overload
+    def __next__(self, n):
+        # type: (int) -> List[T]
+        pass
+
     def __next__(self, n=None):
+        # notype
         # note: prevent 2to3 to transform self.next() in next(self) which
         # causes an infinite loop !
         return getattr(self, 'next')(n)
@@ -115,6 +142,7 @@ class peek_iter(object):
                 self._cache.append(self.sentinel)
 
     def has_next(self):
+        # type: () -> bool
         """Determine if iterator is exhausted.
 
         Returns
@@ -125,21 +153,31 @@ class peek_iter(object):
         Note
         ----
         Will never raise :exc:`StopIteration`.
-
         """
         return self.peek() != self.sentinel
 
+    @overload
+    def next(self):
+        # type: () -> T
+        pass
+
+    @overload
+    def next(self, n):
+        # type: (int) -> List[T]
+        pass
+
     def next(self, n=None):
+        # notype
         """Get the next item or `n` items of the iterator.
 
         Parameters
         ----------
-        n : int or None
+        n : Optional[int]
             The number of items to retrieve. Defaults to None.
 
         Returns
         -------
-        item or list of items
+        Union[T, List[T]]
             The next item or `n` items of the iterator. If `n` is None, the
             item itself is returned. If `n` is an int, the items will be
             returned in a list. If `n` is 0, an empty list is returned.
@@ -148,14 +186,13 @@ class peek_iter(object):
         ------
         StopIteration
             Raised if the iterator is exhausted, even if `n` is 0.
-
         """
         self._fillcache(n)
         if not n:
             if self._cache[0] == self.sentinel:
                 raise StopIteration
             if n is None:
-                result = self._cache.popleft()
+                result = self._cache.popleft()  # type: Union[T, List[T]]
             else:
                 result = []
         else:
@@ -164,14 +201,26 @@ class peek_iter(object):
             result = [self._cache.popleft() for i in range(n)]
         return result
 
+    @overload
+    def peek(self):
+        # type: () -> T
+        pass
+
+    @overload
+    def peek(self, n):
+        # type: (int) -> List[T]
+        pass
+
     def peek(self, n=None):
+        # notype
         """Preview the next item or `n` items of the iterator.
 
         The iterator is not advanced when peek is called.
 
         Returns
         -------
-        item or list of items
+        n : Optional[int]
+        Union[T, List[T]]
             The next item or `n` items of the iterator. If `n` is None, the
             item itself is returned. If `n` is an int, the items will be
             returned in a list. If `n` is 0, an empty list is returned.
@@ -182,22 +231,21 @@ class peek_iter(object):
         Note
         ----
         Will never raise :exc:`StopIteration`.
-
         """
         self._fillcache(n)
         if n is None:
-            result = self._cache[0]
+            result = self._cache[0]  # type: Union[T, List[T]]
         else:
             result = [self._cache[i] for i in range(n)]
         return result
 
 
-class modify_iter(peek_iter):
+class modify_iter(peek_iter[T]):
     """An iterator object that supports modifying items as they are returned.
 
     Parameters
     ----------
-    o : iterable or callable
+    obj : Iterable[Any]
         `o` is interpreted very differently depending on the presence of
         `sentinel`.
 
@@ -206,13 +254,13 @@ class modify_iter(peek_iter):
 
         If `sentinel` is given, then `o` must be a callable object.
 
-    sentinel : any value, optional
+    sentinel : Optional[Any]
         If given, the iterator will call `o` with no arguments for each
         call to its `next` method; if the value returned is equal to
         `sentinel`, :exc:`StopIteration` will be raised, otherwise the
         value will be returned.
 
-    modifier : callable, optional
+    modifier : Callable[[Any], T]
         The function that will be used to modify each item returned by the
         iterator. `modifier` should take a single argument and return a
         single value. Defaults to ``lambda x: x``.
@@ -222,7 +270,7 @@ class modify_iter(peek_iter):
 
     Attributes
     ----------
-    modifier : callable
+    modifier : Callable
         `modifier` is called with each item in `o` as it is iterated. The
         return value of `modifier` is returned in lieu of the item.
 
@@ -247,9 +295,9 @@ class modify_iter(peek_iter):
     "whitespace."
 
     """
-    def __init__(self, obj, sentinel=None, modifier=None):
-        """__init__(o, sentinel=None, modifier=lambda x: x)"""
-        self.modifier = modifier if modifier is not None else lambda x: x
+    def __init__(self, obj, modifier, sentinel=None):
+        # type: (Iterable[Any], Callable[[Any], T], Optional[Any]) -> None
+        self.modifier = modifier
         if not callable(self.modifier):
             raise TypeError('modify_iter(o, modifier): '
                             'modifier must be callable')
@@ -274,20 +322,21 @@ class modify_iter(peek_iter):
 
 class GoogleDocstring(object):
 
-    _directive_sections = []
+    _directive_sections = []  # type: List[str]
 
     def __init__(self, docstring):
-
+        # type: (Union[str, List[str]]) -> None
         if isinstance(docstring, string_types):
             docstring = docstring.splitlines()
         self._lineno = 1
         self._lines = docstring
 
         def next_line(line):
+            # type: (str) -> Tuple[str, int]
             self._lineno += 1
             return line.rstrip(), self._lineno
 
-        self._line_iter = modify_iter(docstring, SENTINEL, modifier=next_line)
+        self._line_iter = modify_iter(docstring, next_line, SENTINEL)
         self._is_in_section = False
         self._section_indent = 0
 
@@ -350,6 +399,7 @@ class GoogleDocstring(object):
         return lines
 
     def _consume_field(self, parse_type=True, prefer_type=False):
+        # type: (bool, bool) -> Tuple[str, Optional[str], int]
         line, lineno = next(self._line_iter)
 
         before, colon, after = self._partition_field_on_colon(line, lineno)
@@ -400,6 +450,7 @@ class GoogleDocstring(object):
         return []
 
     def _consume_section_header(self):
+        # type: () -> str
         section, _ = next(self._line_iter)
         stripped_section = section.strip(':')
         if stripped_section.lower() in self._sections:
@@ -430,6 +481,7 @@ class GoogleDocstring(object):
             return [(line[min_indent:], lineno) for line, lineno in lines]
 
     def _escape_args_and_kwargs(self, name):
+        # type: (str) -> str
         if name[:2] == '**':
             return r'\*\*' + name[2:]
         elif name[:1] == '*':
@@ -476,6 +528,7 @@ class GoogleDocstring(object):
         return False
 
     def _is_section_header(self):
+        # type: () -> bool
         section = self._line_iter.peek()[0].lower()
         match = _google_section_regex.match(section)
         if match and section.strip(':') in self._sections:
@@ -490,12 +543,14 @@ class GoogleDocstring(object):
         return False
 
     def _is_section_break(self):
+        # type: () -> bool
         line, _ = self._line_iter.peek()
-        return (not self._line_iter.has_next() or
-                self._is_section_header() or
-                (self._is_in_section and
-                    line and
-                    not self._is_indented(line, self._section_indent)))
+        return bool(
+            not self._line_iter.has_next() or
+            self._is_section_header() or
+            (self._is_in_section and
+                line and
+                not self._is_indented(line, self._section_indent)))
 
     def parse(self):
         self._consume_empty()

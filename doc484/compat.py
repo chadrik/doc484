@@ -6,7 +6,7 @@ PY3 = sys.version_info[0] == 3
 
 if PY3:
     string_types = str,
-    range = range
+    range = range  # type: ignore
 else:
     string_types = unicode, str
     range = xrange

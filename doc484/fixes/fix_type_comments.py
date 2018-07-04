@@ -21,7 +21,7 @@ from __future__ import absolute_import, print_function
 import re
 from lib2to3 import pytree
 from lib2to3.pgen2 import token
-from lib2to3 import fixer_base
+from lib2to3 import fixer_base  # type: ignore
 from lib2to3.fixer_util import syms
 from lib2to3.pygram import python_grammar
 
@@ -39,6 +39,7 @@ SPECIAL_METHOD_RETURN = {
 
 
 def _get_type(typ, default='Any'):
+    # type: (Optional[str], str) -> str
     return default if typ is None else typ
 
 
@@ -62,6 +63,20 @@ def find_classdef(node):
 
 
 def get_docstring(suite):
+    # type: (list) -> Tuple[Optional[str], Optional[int], Optional[pytree.Node]]
+    """
+    Get docstring data from a lib2t3 suite object
+
+    Parameters
+    ----------
+    suite : list
+
+    Returns
+    -------
+    docstring : Optional[str]
+    lineno : Optional[int]
+    indent_node : Optional[pytree.Node]
+    """
     assert isinstance(suite, list)
     if suite[0].children[1].type == token.INDENT:
         indent_node = suite[0].children[1]
@@ -72,15 +87,35 @@ def get_docstring(suite):
 
     if isinstance(doc_node, pytree.Node) and \
             doc_node.children[0].type == token.STRING:
-        doc = doc_node.children[0].value
+        leaf = doc_node.children[0]
+        if not isinstance(leaf, pytree.Leaf):
+            raise RuntimeError
+        doc = leaf.value
         # convert '"docstring"' to 'docstring'
         # FIXME: something better than eval
-        return eval(doc), doc_node.children[0].lineno, indent_node
+        return eval(doc), leaf.lineno, indent_node
     else:
         return None, None, indent_node
 
 
 def keep_arg(i, arg_name, typ):
+    # type: (int, str, Optional[str]) -> bool
+    """
+    Return whether `arg_name` should be included in the type annotation.
+
+    Parameters
+    ----------
+    i : int
+        position within the arg list
+
+    arg_name : str
+    typ : Optional[str]
+        type of the arg
+
+    Returns
+    -------
+    bool
+    """
     # we can't *easily* tell from here if the current func is a
     # method, but the below is a pretty good assurance that we can skip
     # the current arg.
@@ -99,6 +134,7 @@ class FixTypeComments(fixer_base.BaseFix):
     """
 
     def parse_docstring(self, docstring, line):
+
         if docstring:
             params, result = formats.parse_docstring(docstring, line=line,
                                                      filename=self.filename)

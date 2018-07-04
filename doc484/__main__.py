@@ -7,7 +7,7 @@ import optparse
 import os
 import sys
 
-from lib2to3 import refactor
+from lib2to3 import refactor  # type: ignore
 from lib2to3.main import warn, StdoutRefactoringTool
 
 from doc484.compat import PY3

@@ -2,9 +2,9 @@ from __future__ import absolute_import, print_function
 
 import docutils.nodes
 from docutils.core import Publisher
-from docutils import io
+from docutils import io  # type: ignore
 from docutils.utils import SystemMessage
-from docutils.nodes import Element
+from docutils.nodes import Element, Node  # type: ignore
 from docutils.readers.standalone import Reader as _Reader
 
 from doc484.parsers import Arg
@@ -37,7 +37,7 @@ class Reader(_Reader):
 
 
 def publish_doctree(source, logger):
-    # type: (str, Any) -> docutils.nodes.Node
+    # type: (str, Any) -> Node
     pub = Publisher(reader=None, parser=None, writer=None,
                     settings=None,
                     source_class=io.StringInput,
