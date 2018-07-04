@@ -10,6 +10,7 @@ docs/build/
 /out/
 .venv/
 .mypy_cache/
+.pytest_cache/
 .incremental_checker_cache.json
 .cache
 .tox
