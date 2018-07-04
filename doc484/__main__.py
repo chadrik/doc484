@@ -1,3 +1,5 @@
+"""Generate PEP 484 type annotations from docstrings."""
+
 from __future__ import absolute_import, print_function
 
 import logging
@@ -92,19 +94,16 @@ def _get_options_data(parser):
 
 
 # copied and modified from lib2to3.main
-def main(args=None):
-    """Main program.
-
-    Returns a suggested exit status (0, 1, 2).
-    """
+def _main(args=None):
     # Set up option parser
-    parser = optparse.OptionParser(usage="doc484 [options] file|dir ...")
+    parser = optparse.OptionParser(usage="doc484 [options] file|dir ...",
+                                   description=__doc__)
     parser.add_option("-d", "--doctests_only", action="store_true",
                       default=False, help="Fix up doctests only")
     parser.add_option("-f", "--format",
-                      choices=list(doc484.formats.format_map.keys()),
-                      help="Docstring convention used by the files to be "
-                      "converted (by default this is "
+                      choices=sorted(doc484.formats.format_map.keys()),
+                      help="Specify the docstring convention used within "
+                      "files to be converted (by default this is "
                       "automatically determined by inspecting each docstring "
                       "but it is faster and more reliable to specify this "
                       "explicitly)")
@@ -250,7 +249,11 @@ def main(args=None):
     return rt.errors
 
 
-if __name__ == '__main__':
-    errors = main()
+def main(args=None):
+    errors = _main(args)
     # Return error status (0 if rt.errors is zero)
-    sys.exit(int(bool(errors)))
+    return int(bool(errors))
+
+
+if __name__ == '__main__':
+    sys.exit(main())

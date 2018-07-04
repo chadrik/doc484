@@ -3,7 +3,7 @@ from __future__ import absolute_import, print_function
 import logging
 import pytest
 from lib2to3.refactor import RefactoringTool, get_fixers_from_package
-from doc484.__main__ import main
+from doc484.__main__ import _main as main
 
 
 def convert_string(input):

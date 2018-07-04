@@ -17,8 +17,6 @@ NAMED_ITEMS_ERROR = 'Named results are not allowed. Use Tuple[] or ' \
                     'NamedTuple, or enable allow_named_results'
 NAMED_RESULTS_REG = re.compile(r'[a-zA-Z_][a-zA-Z0-9_]*\s+\(([^)]+)\)')
 
-# logging.basicConfig()
-
 _logger = None
 
 # mapping of arg -> type annotation

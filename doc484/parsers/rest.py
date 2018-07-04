@@ -21,8 +21,6 @@ class Reader(_Reader):
     doc_logger = None
 
     def pass_to_format_logger(self, msg):
-        # print(msg.attributes, msg.children)
-
         if msg['type'] == 'ERROR':
             log = self.doc_logger.error
         elif msg['type'] == 'WARNING':
