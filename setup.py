@@ -25,7 +25,6 @@ setup(
     extras_require={
         "tests": [
             "coverage",
-            "mock==2.0.0",
             "pytest==3.6.2",
             "tox==2.7.0",
         ],

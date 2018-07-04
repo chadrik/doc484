@@ -41,15 +41,12 @@ if TYPE_CHECKING:
     from typing import *
     T = TypeVar('T')
 else:
-    # alternative to typing.Generic to accelerate isinstance / issubclass.
-    # the trade-off is loss of dynamic inspection of generics (meh).
     class FakeGenericMeta(type):
         def __getitem__(self, params):
             return self
 
-    class Generic(object):
-        __metaclass__ = FakeGenericMeta
-        __slots__ = ()
+    Generic = FakeGenericMeta('Generic', (object,), {})
+
     T = object()
     overload = lambda f: f
 
