@@ -9,11 +9,9 @@ function gitfiles() {
         # FIXME: limit to the paths below pwd
         # echo "Processing all files in repository"
         paths=$(git ls-files | grep "\.py$" | awk -v root="$root" '{print root"/"$1}')
-        echo $paths
     else
         # echo "Processing modified in repository"
         paths=$({ git diff --name-only ; git diff --name-only --staged ; } | sort | uniq | grep "\.py$" | awk -v root="$root" '{print root"/"$1}')
-        echo $paths
     fi
 }
 
@@ -26,22 +24,19 @@ function hgfiles() {
         # FIXME: limit to the paths below pwd
         # echo "Processing all files in repository"
         paths=$(hg manifest | grep "\.py$" | awk -v root="$root" '{print root"/"$1}')
-        echo $paths
     else
         # echo "Processing modified in repository"
         paths=$(hg status -m -a -n | grep "\.py$" | awk -v root="$root" '{print root"/"$1}')
-        echo $paths
     fi
 }
 
 # generate python type comments from docstrings
 function doctypes() {
-    procs=12
     if [[ -z "$1" || "$1" == "." ]]; then
         # no paths given. find modified files in the current repo
-        paths=`gitfiles $1`
+        gitfiles $1
         if [ $? -ne 0 ]; then
-            paths=`hgfiles $1`
+            hgfiles $1
             if [ $? -ne 0 ]; then
                 echo "Error: could not find .git or .hg directory"
                 exit 1
@@ -50,9 +45,11 @@ function doctypes() {
     else
         # use provided paths
         paths="$@"
+        root=`pwd`
     fi
+    cd $root
     echo "Converting docstrings to type comments"
-    python -m doc484 --write --processes=$procs $paths
+    doc484 --write $paths
 }
 
 doctypes "$@"
