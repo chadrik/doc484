@@ -112,7 +112,9 @@ def _main(args=None):
                       help="Default type to use for undocumented return "
                       "values (defaults to 'Any'")
     parser.add_option("-j", "--processes", action="store", default=1,
-                      type="int", help="Run 2to3 concurrently")
+                      type="int", help="Number of concurrent processes to use"
+                      "for conversion (using more than the number of physical"
+                      "cores is usually beneficial)")
     # parser.add_option("-f", "--fix", action="append", default=[],
     #                   help="Each FIX specifies a transformation; default: all")
     # parser.add_option("-x", "--nofix", action="append", default=[],
@@ -124,8 +126,6 @@ def _main(args=None):
                       help="Modify the grammar so that print() is a function")
     parser.add_option("-v", "--verbose", action="store_true", default=False,
                       help="More verbose logging")
-    # parser.add_option("--show-diffs", action="store_true", default=False,
-    #                   help="Show diffs of the refactoring")
     parser.add_option("-w", "--write", action="store_true", default=False,
                       help="Write back modified files")
     parser.add_option("-c", "--config", action="store", type="str",

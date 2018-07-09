@@ -186,5 +186,6 @@ TODO
 ====
 
 - automatically insert ``typing`` imports
-- convert docstrings to function annotations (for python 3.5+)
+- add option to convert docstrings to function annotations (for python 3.5+)
+- complete support for fixing non-PEP484-compliant docstrings (e.g. ``list of str``)
 - convert ``doctypes`` utility script to python?
