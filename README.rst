@@ -19,7 +19,7 @@ Why Use This?
 
 If you answer affirmative to at least 2 of these, this project is probably for you:
 
-- You're stuck supporting python 2.7, so you have to use type comments, which are far less comprehensible than the type annotations supported in 3.5+
+- You're stuck supporting python 2.7, so you have to use type comments, instead of the type annotations supported in 3.5+
 - Your projects have existing docstrings with types that are already mostly correct
 - You find it easier to maintain and comprehend types specified alongside the description of an argument
 
@@ -55,10 +55,8 @@ Before
         return '\n'.join(input.split('\n')[:numlines])
 
 
-After
------
-
-After running `doc484`:
+After ``doc484``
+----------------
 
 .. code:: python
 
@@ -121,8 +119,8 @@ Before
             yield x.strip(char), x.count(char)
 
 
-After
------
+After ``doc484``
+----------------
 
 .. code:: python
 
@@ -165,7 +163,7 @@ Usage
 
     doc484 -h
 
-By default ``doc484`` will not modify files, instead it will print out a diff of what would be modified.  When you're ready to make changes, add the `--write` flag.
+By default ``doc484`` will *not* modify files, instead it will print out a diff of what would be modified.  When you're ready to make changes, add the ``--write`` flag.
 
 Check the scripts directory for an example of how to automatically run ``doc484`` on modified files in your git or mercurial repository.
 
@@ -176,7 +174,7 @@ Configuration
 You can override any of the command line options using an ini-style configuration file.
 By default, ``doc484`` looks for a setup.cfg file in the current working directory, but you can also provide a config explicitly using the ``--config`` option.
 
-For example, to override the number of processes to use when converting, and specify the docstring format for the project, add this to your setup.cfg and run `doc484` from the directory where this config file resides:
+For example, to override the number of processes to use when converting, and specify the docstring format for the project, add this to your setup.cfg and run ``doc484`` from the directory where this config file resides:
 
 .. code:: ini
 
@@ -189,5 +187,5 @@ TODO
 
 - automatically insert ``typing`` imports
 - add option to convert docstrings to function annotations (for python 3.5+)
-- complete support for fixing non-PEP484-compliant docstrings (e.g. ``list of str``)
+- finish support for fixing non-PEP484-compliant docstrings (e.g. ``list of str``)
 - convert ``doctypes`` utility script to python?
