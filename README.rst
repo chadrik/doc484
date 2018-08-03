@@ -10,16 +10,16 @@ Doc 484
 Generate PEP 484 type annotations from docstrings
 =================================================
 
-``doc484`` provides a script to find PEP 484 type annotations within your docstrings and convert them to type comments. It supports the three major docstring conventions `numpy <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html#example-numpy>`_, `google <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html>`_, and `restructuredText <https://thomas-cokelaer.info/tutorials/sphinx/docstring_python.html#template-py-source-file>`_
+``doc484`` provides a script to find type declarations within your docstrings and convert them to PEP 484 type comments. It supports the three major docstring conventions `numpy <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html#example-numpy>`_, `google <http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html>`_, and `restructuredText (sphinx) <https://thomas-cokelaer.info/tutorials/sphinx/docstring_python.html#template-py-source-file>`_
 
 Regardless of docstring convention you choose, the types declared within your docstrings should following the guidelines in `PEP 484 <https://www.python.org/dev/peps/pep-0484/>`_, especially use of the `typing <https://docs.python.org/3/library/typing.html>`_ module, where necessary.
 
 Why Use This?
 =============
 
-If you answer affirmative to at least 2 of these, this project may be for you:
+If you answer affirmative to at least 2 of these, this project is probably for you:
 
-- You're stuck supporting python 2.x, so you have to use type comments, which are much harder to visually grok
+- You're stuck supporting python 2.7, so you have to use type comments, which are far less comprehensible than the type annotations supported in 3.5+
 - Your projects have existing docstrings with types that are already mostly correct
 - You find it easier to maintain and comprehend types specified alongside the description of an argument
 
@@ -58,6 +58,8 @@ Before
 After
 -----
 
+After running `doc484`:
+
 .. code:: python
 
     from typing import Optional
@@ -87,7 +89,7 @@ The file is now properly inspectable by mypy or PyCharm.
 Advanced
 ~~~~~~~~
 
-A more complex example demonstrates some of the added readability that comes from specifying type annotations within your docstrings.
+A more complex example demonstrates some of the added readability that comes from specifying types within your docstrings.
 Below we use numpy format to document a generator of tuples:
 
 Before
