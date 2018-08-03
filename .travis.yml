@@ -18,15 +18,16 @@ matrix:
       env: TOXENV=py36
     - python: "3.7"
       env: TOXENV=py37
+      dist: xenial
+      sudo: true
     # Prevent breakage by a new releases
-    # - python: "3.7-dev"
-    #   env: TOXENV=py37
+    - python: "3.7-dev"
+      env: TOXENV=py37
     - python: "3.6"
       env: TOXENV=mypy
 
-#   allow_failures:
-#     - python: "3.6-dev"
-#     - python: "3.7-dev"
+  allow_failures:
+    - python: "3.7-dev"
 
 
 install:
