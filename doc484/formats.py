@@ -341,7 +341,8 @@ def parse_docstring(docstring, line=0, filename='<string>', logger=None,
 
     Returns
     -------
-    Tuple[OrderedDict[str, Arg], Optional[Arg]]
+    params : OrderedDict[str, Arg]
+    results : Optional[Arg]
     """
     if format_name is None:
         # fall back to the global default (as set by set_default_format)

@@ -139,7 +139,7 @@ class FixTypeComments(fixer_base.BaseFix):
             params, result = formats.parse_docstring(docstring, line=line,
                                                      filename=self.filename)
             return {k: v.type for k, v in params.items() if v.type}, \
-                   result.type if result else None
+                    result.type if result else None
         else:
             return {}, None
 
@@ -164,14 +164,15 @@ class FixTypeComments(fixer_base.BaseFix):
 
         has_type_comment = is_type_comment(comment)
 
-        # if we have a default argument map and there's no existing type comment
-        # then we can still proceed.
-        if docstring is None and not (formats.default_arg_types
-                                      and not has_type_comment):
+        if docstring is None and not has_type_comment:
             return
 
         types = []  # type: List[str]
         params, result = self.parse_docstring(docstring, line)
+
+        if not params and not result and not has_type_comment:
+            # if the user has provided type annoations, we always use them
+            return
 
         if args:
             # if args.type == syms.tfpdef:
@@ -206,16 +207,15 @@ class FixTypeComments(fixer_base.BaseFix):
                 if not is_method or keep_arg(i, arg.value, typ):
                     types.append(kind + _get_type(typ).strip('*'))
 
-        if result is None and all([x.strip('*') == 'Any' for x in types]):
-            # no effect: don't bother with type comment
-            return
-
         default_return = formats.default_return_type
         if is_method and name in SPECIAL_METHOD_RETURN:
             default_return = SPECIAL_METHOD_RETURN[name]
 
         typestr = '# type: (%s) -> %s\n' % (', '.join(types),
                                             _get_type(result, default_return))
+
+        if comment == typestr:
+            return
 
         if comment and not has_type_comment:
             # push existing non-type comment to next line

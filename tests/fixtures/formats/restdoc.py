@@ -73,6 +73,17 @@ def no_docs(one, *two, **three):
     pass
 
 
+def any_doc_types(one, *two, **three):
+    """
+    Docstring with explicit Any types triggers comment generation
+
+    :type one: Any
+    :type two: Any
+
+    :rtype: Any
+    """
+
+
 def existing_type_comment(one, two, three):
     # type: (Union[str, int], Any, Any) -> bool
     """
@@ -82,6 +93,18 @@ def existing_type_comment(one, two, three):
     :type two: str
 
     :rtype: bool
+    """
+
+
+def existing_type_comment_any(one, two, three):
+    # type: (Union[str, int], Any, Any) -> bool
+    """
+    Existing type comments should be overwritten, even with Any types
+
+    :type one: Any
+    :type two: Any
+
+    :rtype: Any
     """
 
 
