@@ -164,7 +164,7 @@ class FixTypeComments(fixer_base.BaseFix):
 
         has_type_comment = is_type_comment(comment)
 
-        if docstring is None and not has_type_comment:
+        if docstring is None:
             return
 
         types = []  # type: List[str]

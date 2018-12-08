@@ -185,3 +185,12 @@ class InitDocsAtClassLevel:
     """
     def __init__(self, one, two, three):
         pass
+
+
+def nodocs_no_types(arg1, arg2):
+    pass
+
+
+def nodocs_with_types(arg1, arg2):
+    # type: (int, str) -> int
+    pass
