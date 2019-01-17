@@ -63,16 +63,6 @@ def skiptype(one, two, three):
     """
 
 
-def no_doc_types(one, *two, **three):
-    """
-    Docstring with no types
-    """
-
-
-def no_docs(one, *two, **three):
-    pass
-
-
 def any_doc_types(one, *two, **three):
     """
     Docstring with explicit Any types triggers comment generation
@@ -169,12 +159,3 @@ class InitDocsAtClassLevel:
     def __init__(self, one, two, three):
         # type: (Union[str, int], str, Any) -> None
         pass
-
-
-def nodocs_no_types(arg1, arg2):
-    pass
-
-
-def nodocs_with_types(arg1, arg2):
-    # type: (int, str) -> int
-    pass

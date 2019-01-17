@@ -170,7 +170,7 @@ class FixTypeComments(fixer_base.BaseFix):
         types = []  # type: List[str]
         params, result = self.parse_docstring(docstring, line)
 
-        if not params and not result and not has_type_comment:
+        if not params and not result:
             # if the user has provided type annoations, we always use them
             return
 

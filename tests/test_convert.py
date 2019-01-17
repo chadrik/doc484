@@ -13,7 +13,7 @@ def convert_string(input):
 
 
 @pytest.mark.parametrize("config", ['test1', 'test2'])
-@pytest.mark.parametrize("format", ['numpydoc', 'googledoc', 'restdoc'])
+@pytest.mark.parametrize("format", ['numpydoc', 'googledoc', 'restdoc', 'agnostic'])
 def test_cli(format, config, pytestconfig, tmpdir, caplog):
     fixturedir = pytestconfig.rootdir.join('tests', 'fixtures')
 
@@ -28,12 +28,16 @@ def test_cli(format, config, pytestconfig, tmpdir, caplog):
     # by calling basicConfig, main sets up the root logger and loglevel for
     # all of lib2to3: it defaults to INFO, but --verbose sets it to DEBUG.
     caplog.set_level(logging.INFO)
-    errors = main(["--write", "--output-dir", str(tmpdir), str(source)])
+    # also write unchanged files so that the agnostic tests write something to diff
+    errors = main(["--write", "--write-unchanged-files",
+                   "--output-dir", str(tmpdir), str(source)])
 
     records = [x[2] for x in caplog.record_tuples if x[0] == 'doc484.formats']
     assert records == []
 
     assert errors == []
+
+    assert dest.exists()
 
     with dest.open() as f:
         destlines = f.read()
