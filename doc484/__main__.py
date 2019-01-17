@@ -10,6 +10,7 @@ import sys
 from lib2to3 import refactor  # type: ignore
 from lib2to3.main import warn, StdoutRefactoringTool
 
+from doc484 import __version__
 from doc484.compat import PY3
 import doc484.formats
 
@@ -97,7 +98,9 @@ def _get_options_data(parser):
 def _main(args=None):
     # Set up option parser
     parser = optparse.OptionParser(usage="doc484 [options] file|dir ...",
-                                   description=__doc__)
+                                   description=__doc__,
+                                   version="doc484 {}".format(__version__))
+
     parser.add_option("-d", "--doctests_only", action="store_true",
                       default=False, help="Fix up doctests only")
     parser.add_option("-f", "--format",
