@@ -80,7 +80,7 @@ def _get_options_data(parser):
     defaults = parser.get_default_values().__dict__
     keys = []
     for opt in parser.option_list:
-        if opt.dest == 'config':
+        if opt.dest == 'config' or opt.action == 'version':
             continue
         opttype = opt.type
         if opttype is None:
