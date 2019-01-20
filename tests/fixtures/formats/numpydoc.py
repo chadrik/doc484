@@ -237,3 +237,16 @@ class InitDocsAtClassLevel:
     """
     def __init__(self, one, two, three):
         pass
+
+
+def no_valid_doc_types(foo, bar):
+    """
+    Docstring doc types which do not match the argument names
+
+    Type comment should be generated
+
+    Parameters
+    ----------
+    one : Union[str, int]
+    two : str
+    """
