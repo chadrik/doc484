@@ -101,8 +101,6 @@ def _main(args=None):
                                    description=__doc__,
                                    version="doc484 {}".format(__version__))
 
-    parser.add_option("-d", "--doctests_only", action="store_true",
-                      default=False, help="Fix up doctests only")
     parser.add_option("-f", "--format",
                       choices=sorted(doc484.formats.format_map.keys()),
                       help="Specify the docstring convention used within "
@@ -124,9 +122,6 @@ def _main(args=None):
     #                   help="Prevent a transformation from being run")
     # parser.add_option("-l", "--list-fixes", action="store_true", default=False,
     #                   help="List available transformations")
-    parser.add_option("-p", "--print-function", action="store_true",
-                      default=False,
-                      help="Modify the grammar so that print() is a function")
     parser.add_option("-v", "--verbose", action="store_true", default=False,
                       help="More verbose logging")
     parser.add_option("-w", "--write", action="store_true", default=False,
@@ -141,10 +136,6 @@ def _main(args=None):
                       default=False,
                       help="Also write files even if no changes were required"
                       " (useful with --output-dir); implies -w.")
-    parser.add_option("--add-suffix", action="store", type="str", default="",
-                      help="Append this string to all output filenames."
-                      " Requires -n if non-empty.  "
-                      "ex: --add-suffix='i' will generate .pyi files.")
 
     # Parse command line arguments
     refactor_stdin = False
@@ -165,6 +156,8 @@ def _main(args=None):
     level = logging.DEBUG if options.verbose else logging.INFO
     logging.basicConfig(format='%(message)s', level=level)
     logger = logging.getLogger('doc484.main')
+
+    # logging.getLogger("RefactoringTool").setLevel(level)
 
     if options.format:
         logger.info("Using %r format" % options.format)
@@ -194,8 +187,6 @@ def _main(args=None):
         if options.write:
             print("Can't write to stdin.", file=sys.stderr)
             return 2
-    if options.print_function:
-        flags["print_function"] = True
 
     # NOTE: removing this until we have more fixes
     # Initialize the refactoring tool
@@ -231,8 +222,7 @@ def _main(args=None):
             sorted(fixer_names), flags, sorted(explicit),
             nobackups=True, show_diffs=show_diffs,
             input_base_dir=input_base_dir,
-            output_dir=options.output_dir,
-            append_suffix=options.add_suffix)
+            output_dir=options.output_dir)
 
     # Refactor all files and directories passed as arguments
     if not rt.errors:
@@ -240,8 +230,8 @@ def _main(args=None):
             rt.refactor_stdin()
         else:
             try:
-                rt.refactor(args, options.write, options.doctests_only,
-                            options.processes)
+                rt.refactor(args, options.write,
+                            num_processes=options.processes)
             except refactor.MultiprocessingUnsupported:
                 assert options.processes > 1
                 print("Sorry, -j isn't supported on this platform.",
