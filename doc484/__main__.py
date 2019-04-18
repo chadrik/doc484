@@ -124,6 +124,9 @@ def _main(args=None):
     #                   help="List available transformations")
     parser.add_option("-v", "--verbose", action="store_true", default=False,
                       help="More verbose logging")
+    parser.add_option("--show-diffs", action="store_true", default=False,
+                      help="Show diffs of the refactoring when writing. "
+                           "(always true when --write is not present)")
     parser.add_option("-w", "--write", action="store_true", default=False,
                       help="Write back modified files")
     parser.add_option("-c", "--config", action="store", type="str",
@@ -169,7 +172,7 @@ def _main(args=None):
             warn("--write-unchanged-files/-W implies -w.")
         options.write = True
 
-    show_diffs = not options.write
+    show_diffs = not options.write or options.show_diffs
 
     # if options.list_fixes:
     #     print("Available transformations for the -f/--fix option:")
@@ -238,7 +241,6 @@ def _main(args=None):
                       file=sys.stderr)
                 return 1
         rt.summarize()
-
     return rt.errors
 
 
