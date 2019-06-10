@@ -214,9 +214,12 @@ class peek_iter(Generic[T]):
 
         The iterator is not advanced when peek is called.
 
+        Parameters
+        ----------
+        n : Optional[int]
+
         Returns
         -------
-        n : Optional[int]
         Union[T, List[T]]
             The next item or `n` items of the iterator. If `n` is None, the
             item itself is returned. If `n` is an int, the items will be
@@ -550,6 +553,7 @@ class GoogleDocstring(object):
                 not self._is_indented(line, self._section_indent)))
 
     def parse(self):
+        # type: () -> Tuple[Optional[List[Tuple[str, Arg]]], Optional[List[Arg]], Optional[List[Arg]]]
         self._consume_empty()
 
         while self._line_iter.has_next():
