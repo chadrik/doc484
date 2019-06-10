@@ -33,3 +33,6 @@ def docs_with_types(arg1, arg2):
 
     The type comment should be preserved
     """
+
+
+def nodocs_one_line(x): return x

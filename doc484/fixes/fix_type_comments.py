@@ -154,6 +154,9 @@ class FixTypeComments(fixer_base.BaseFix):
 
         docstring, line, indent_node = get_docstring(suite)
 
+        if not indent_node:
+            return
+
         comment = indent_node.prefix
         if comment.strip() == '# notype':
             return
