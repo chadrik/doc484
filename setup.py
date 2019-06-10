@@ -11,7 +11,7 @@ def read(*parts):
 
 setup(
     name="doc484",
-    version="0.3.4",
+    version="0.3.5",
     author="Chad Dombrova",
     description="Generate PEP 484 type comments from docstrings",
     long_description=read("README.rst"),
